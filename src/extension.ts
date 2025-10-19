@@ -1,9 +1,11 @@
 import * as vscode from 'vscode';
 import { GitDiffProvider, DiffFileItem } from './gitDiffProvider';
+import { GitOperations } from './gitOperations';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 
 const execAsync = promisify(exec);
+const gitOps = new GitOperations();
 
 let outputChannel: vscode.OutputChannel;
 let autoRefreshTimer: NodeJS.Timeout | undefined;
@@ -215,37 +217,18 @@ export function activate(context: vscode.ExtensionContext) {
 
         // Get all worktrees and add their HEADs
         try {
-            const { stdout: worktreeList } = await execAsync('git worktree list --porcelain', { cwd: workspaceRoot });
-            const lines = worktreeList.trim().split('\n');
-            let currentWorktree: { path?: string; branch?: string } = {};
-
-            for (const line of lines) {
-                if (line.startsWith('worktree ')) {
-                    if (currentWorktree.path && currentWorktree.path !== workspaceRoot) {
-                        const wtName = currentWorktree.path.split(/[/\\]/).pop() || 'worktree';
-                        sourceItems.push({
-                            label: `$(git-branch) ${wtName} HEAD`,
-                            description: `Worktree: ${currentWorktree.branch || 'detached'}`,
-                            ref: 'HEAD',
-                            type: 'worktree-head',
-                            worktreePath: currentWorktree.path
-                        });
-                    }
-                    currentWorktree = { path: line.substring(9) };
-                } else if (line.startsWith('branch ')) {
-                    currentWorktree.branch = line.substring(7).split('/').pop() || 'unknown';
+            const worktrees = await gitOps.getWorktrees(workspaceRoot);
+            for (const wt of worktrees) {
+                if (!wt.isMain) {
+                    const wtName = wt.path.split(/[/\\]/).pop() || 'worktree';
+                    sourceItems.push({
+                        label: `$(git-branch) ${wtName} HEAD`,
+                        description: `Worktree: ${wt.branch}`,
+                        ref: 'HEAD',
+                        type: 'worktree-head',
+                        worktreePath: wt.path
+                    });
                 }
-            }
-            // Add last worktree
-            if (currentWorktree.path && currentWorktree.path !== workspaceRoot) {
-                const wtName = currentWorktree.path.split(/[/\\]/).pop() || 'worktree';
-                sourceItems.push({
-                    label: `$(git-branch) ${wtName} HEAD`,
-                    description: `Worktree: ${currentWorktree.branch || 'detached'}`,
-                    ref: 'HEAD',
-                    type: 'worktree-head',
-                    worktreePath: currentWorktree.path
-                });
             }
         } catch (error) {
             outputChannel.appendLine(`Could not load worktrees: ${error}`);
@@ -267,44 +250,35 @@ export function activate(context: vscode.ExtensionContext) {
 
         const targetItems: RefPickItem[] = [];
 
-        // Get all remote branches
-        const { stdout: remoteBranches } = await execAsync('git branch -r --format=%(refname:short)', { cwd: workspaceRoot });
-        if (remoteBranches.trim()) {
-            remoteBranches.trim().split('\n').forEach(branch => {
-                targetItems.push({
-                    label: `$(cloud) ${branch}`,
-                    description: 'remote branch',
-                    ref: branch,
-                    type: 'remote'
-                });
-            });
-        }
+        const branches = await gitOps.getAllBranches(workspaceRoot);
 
-        // Get all local branches
-        const { stdout: localBranches } = await execAsync('git branch --format=%(refname:short)', { cwd: workspaceRoot });
-        if (localBranches.trim()) {
-            localBranches.trim().split('\n').forEach(branch => {
-                targetItems.push({
-                    label: `$(git-branch) ${branch}`,
-                    description: 'local branch',
-                    ref: branch,
-                    type: 'local'
-                });
+        branches.remote.forEach(branch => {
+            targetItems.push({
+                label: `$(cloud) ${branch}`,
+                description: 'remote branch',
+                ref: branch,
+                type: 'remote'
             });
-        }
+        });
 
-        // Get all tags
-        const { stdout: tags } = await execAsync('git tag', { cwd: workspaceRoot });
-        if (tags.trim()) {
-            tags.trim().split('\n').forEach(tag => {
-                targetItems.push({
-                    label: `$(tag) ${tag}`,
-                    description: 'tag',
-                    ref: tag,
-                    type: 'tag'
-                });
+        branches.local.forEach(branch => {
+            targetItems.push({
+                label: `$(git-branch) ${branch}`,
+                description: 'local branch',
+                ref: branch,
+                type: 'local'
             });
-        }
+        });
+
+        const tags = await gitOps.getAllTags(workspaceRoot);
+        tags.forEach(tag => {
+            targetItems.push({
+                label: `$(tag) ${tag}`,
+                description: 'tag',
+                ref: tag,
+                type: 'tag'
+            });
+        });
 
         const target = await vscode.window.showQuickPick(targetItems, {
             placeHolder: 'Select target (what to compare TO)',
