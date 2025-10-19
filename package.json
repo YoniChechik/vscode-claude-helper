@@ -1,13 +1,29 @@
 {
   "name": "git-diff-viewer",
-  "displayName": "Git Diff",
-  "description": "View git diff files",
+  "displayName": "Git Diff Viewer",
+  "description": "Compare git changes across branches, worktrees, and commits with a clean tree view",
   "version": "0.6.0",
-  "publisher": "local",
+  "publisher": "YoniChechik",
+  "author": {
+    "name": "Yoni Chechik"
+  },
+  "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/yourusername/git-diff-viewer"
+    "url": "https://github.com/YoniChechik/vscode-git-diff-extension"
   },
+  "bugs": {
+    "url": "https://github.com/YoniChechik/vscode-git-diff-extension/issues"
+  },
+  "homepage": "https://github.com/YoniChechik/vscode-git-diff-extension#readme",
+  "keywords": [
+    "git",
+    "diff",
+    "compare",
+    "branches",
+    "worktree",
+    "source control"
+  ],
   "engines": {
     "vscode": "^1.74.0"
   },
