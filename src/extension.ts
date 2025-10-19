@@ -2,19 +2,41 @@ import * as vscode from 'vscode';
 import { GitDiffProvider, DiffFileItem } from './gitDiffProvider';
 
 let outputChannel: vscode.OutputChannel;
+let autoRefreshTimer: NodeJS.Timeout | undefined;
+
+// Empty file content provider for showing diffs against empty files
+class EmptyFileContentProvider implements vscode.TextDocumentContentProvider {
+    provideTextDocumentContent(_uri: vscode.Uri): string {
+        return ''; // Always return empty content
+    }
+}
 
 export function activate(context: vscode.ExtensionContext) {
     outputChannel = vscode.window.createOutputChannel('Git Diff Viewer');
     outputChannel.appendLine('Git Diff Viewer extension activated');
+
+    // Register empty file content provider
+    const emptyContentProvider = new EmptyFileContentProvider();
+    context.subscriptions.push(
+        vscode.workspace.registerTextDocumentContentProvider('empty', emptyContentProvider)
+    );
+    outputChannel.appendLine('Empty content provider registered');
 
     const gitDiffProvider = new GitDiffProvider();
 
     vscode.window.registerTreeDataProvider('gitDiffExplorer', gitDiffProvider);
 
     vscode.commands.registerCommand('gitDiffExplorer.refresh', () => {
-        outputChannel.appendLine('Refresh command triggered');
+        outputChannel.appendLine('Refresh command triggered (manual)');
         gitDiffProvider.refresh();
     });
+
+    // Auto-refresh every 1 second
+    outputChannel.appendLine('Starting auto-refresh timer (1 second interval)');
+    autoRefreshTimer = setInterval(() => {
+        gitDiffProvider.refresh();
+    }, 1000);
+    outputChannel.appendLine('Auto-refresh timer started');
 
     vscode.commands.registerCommand('gitDiffExplorer.openDiff', async (item: DiffFileItem) => {
         outputChannel.appendLine('=================================================');
@@ -35,19 +57,10 @@ export function activate(context: vscode.ExtensionContext) {
             return;
         }
 
-        const workspaceFolders = vscode.workspace.workspaceFolders;
-        if (!workspaceFolders) {
-            outputChannel.appendLine('[ERROR] No workspace folder open');
-            vscode.window.showErrorMessage('No workspace folder open');
-            return;
-        }
-
-        const workspaceRoot = workspaceFolders[0].uri;
-        outputChannel.appendLine(`[DEBUG] Workspace root: ${workspaceRoot.fsPath}`);
-
-        const fileUri = vscode.Uri.joinPath(workspaceRoot, item.relativePath);
-        outputChannel.appendLine(`[DEBUG] File URI constructed: ${fileUri.toString()}`);
+        const fileUri = vscode.Uri.file(item.absolutePath);
+        outputChannel.appendLine(`[DEBUG] File URI: ${fileUri.toString()}`);
         outputChannel.appendLine(`[DEBUG] File URI fsPath: ${fileUri.fsPath}`);
+        outputChannel.appendLine(`[DEBUG] Worktree path: ${item.worktreePath}`);
 
         const defaultBranch = gitDiffProvider.getDefaultBranch();
         outputChannel.appendLine(`[DEBUG] Default branch: ${defaultBranch}`);
@@ -57,26 +70,76 @@ export function activate(context: vscode.ExtensionContext) {
         outputChannel.appendLine(`[DEBUG] Status char codes: ${Array.from(item.status).map(c => c.charCodeAt(0)).join(', ')}`);
 
         try {
-            // For Added (untracked) files, just open the file
+            // For Added (untracked) files, show diff against empty
             if (item.status === 'Added') {
-                outputChannel.appendLine('[BRANCH] Status is "Added" - opening file directly');
-                await vscode.commands.executeCommand('vscode.open', fileUri);
-                outputChannel.appendLine('[SUCCESS] File opened successfully');
+                outputChannel.appendLine('[BRANCH] Status is "Added" - showing diff vs empty');
+                const title = `${item.label} (New File)`;
+
+                // Create an empty file URI to compare against
+                const emptyUri = fileUri.with({
+                    scheme: 'empty',
+                    path: fileUri.path
+                });
+
+                outputChannel.appendLine(`[DEBUG] Empty URI: ${emptyUri.toString()}`);
+                outputChannel.appendLine(`[DEBUG] Working URI: ${fileUri.toString()}`);
+                outputChannel.appendLine(`[DEBUG] Title: ${title}`);
+
+                // Show diff: empty (left) vs new file (right)
+                await vscode.commands.executeCommand('vscode.diff', emptyUri, fileUri, title);
+                outputChannel.appendLine('[SUCCESS] Added file diff opened successfully');
                 return;
             } else {
                 outputChannel.appendLine(`[BRANCH] Status is NOT "Added" (it is "${item.status}")`);
             }
 
-            // For Deleted files, show the HEAD version
+            // For Deleted files, show diff against empty
             if (item.status === 'Deleted') {
-                outputChannel.appendLine('[BRANCH] Status is "Deleted" - opening from HEAD');
-                const headUri = vscode.Uri.file(fileUri.fsPath).with({
+                outputChannel.appendLine('[BRANCH] Status is "Deleted" - showing diff vs empty');
+
+                // Get the Git extension to access the file from HEAD
+                const gitExtension = vscode.extensions.getExtension('vscode.git');
+                if (!gitExtension) {
+                    outputChannel.appendLine('[ERROR] Git extension not found');
+                    vscode.window.showErrorMessage('Git extension not found');
+                    return;
+                }
+
+                await gitExtension.activate();
+                const git = gitExtension.exports.getAPI(1);
+                const repo = git.repositories[0];
+
+                if (!repo) {
+                    outputChannel.appendLine('[ERROR] No git repository found');
+                    vscode.window.showErrorMessage('No git repository found');
+                    return;
+                }
+
+                const title = `${item.label} (Deleted)`;
+
+                // Create git URI for HEAD version
+                const headUri = fileUri.with({
                     scheme: 'git',
-                    query: 'HEAD'
+                    path: fileUri.path,
+                    query: JSON.stringify({
+                        path: fileUri.fsPath,
+                        ref: 'HEAD'
+                    })
                 });
+
+                // Create empty URI to show the file no longer exists
+                const emptyUri = fileUri.with({
+                    scheme: 'empty',
+                    path: fileUri.path
+                });
+
                 outputChannel.appendLine(`[DEBUG] Head URI: ${headUri.toString()}`);
-                await vscode.commands.executeCommand('vscode.open', headUri);
-                outputChannel.appendLine('[SUCCESS] Deleted file opened successfully');
+                outputChannel.appendLine(`[DEBUG] Empty URI: ${emptyUri.toString()}`);
+                outputChannel.appendLine(`[DEBUG] Title: ${title}`);
+
+                // Show diff: HEAD version (left) vs empty (right)
+                await vscode.commands.executeCommand('vscode.diff', headUri, emptyUri, title);
+                outputChannel.appendLine('[SUCCESS] Deleted file diff opened successfully');
                 return;
             } else {
                 outputChannel.appendLine(`[BRANCH] Status is NOT "Deleted" (it is "${item.status}")`);
@@ -120,7 +183,7 @@ export function activate(context: vscode.ExtensionContext) {
                     outputChannel.appendLine('[DEBUG] repo.toGitUri not available, using manual URI construction');
                     // Method 2: Construct git URI manually with proper cross-platform path handling
                     // Use forward slashes for the path (works on all platforms)
-                    const relativePath = fileUri.fsPath.replace(workspaceRoot.fsPath, '').replace(/\\/g, '/');
+                    const relativePath = fileUri.fsPath.replace(item.worktreePath, '').replace(/\\/g, '/');
                     outputChannel.appendLine(`[DEBUG] Relative path: ${relativePath}`);
 
                     headUri = fileUri.with({
@@ -163,4 +226,11 @@ export function activate(context: vscode.ExtensionContext) {
     outputChannel.appendLine('All commands registered');
 }
 
-export function deactivate() {}
+export function deactivate() {
+    // Extension cleanup on deactivation
+    if (autoRefreshTimer) {
+        clearInterval(autoRefreshTimer);
+        autoRefreshTimer = undefined;
+        outputChannel.appendLine('Auto-refresh timer stopped');
+    }
+}

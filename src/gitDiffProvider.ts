@@ -4,23 +4,45 @@ import { promisify } from 'util';
 
 const execAsync = promisify(exec);
 
+// Represents a git worktree (root level collapsible item)
+export class WorktreeItem extends vscode.TreeItem {
+    constructor(
+        public readonly label: string,
+        public readonly worktreePath: string,
+        public readonly branch: string,
+        public readonly isMain: boolean
+    ) {
+        super(label, vscode.TreeItemCollapsibleState.Expanded);
+        this.tooltip = `${branch} - ${worktreePath}`;
+        this.description = branch;
+        this.iconPath = new vscode.ThemeIcon(isMain ? 'repo' : 'git-branch');
+        this.contextValue = 'worktree';
+        console.log(`[WorktreeItem] Created: label="${label}", path="${worktreePath}", branch="${branch}", isMain=${isMain}`);
+    }
+}
+
+// Represents a file with changes
 export class DiffFileItem extends vscode.TreeItem {
     constructor(
         public readonly label: string,
         public readonly relativePath: string,
+        public readonly absolutePath: string,
         public readonly status: string,
+        public readonly gitState: string,
+        public readonly worktreePath: string,
         public readonly collapsibleState: vscode.TreeItemCollapsibleState
     ) {
         super(label, collapsibleState);
-        this.tooltip = `${status}: ${relativePath}`;
-        this.description = status;
+        this.tooltip = `${status} (${gitState}): ${relativePath}`;
+        this.description = `${status} • ${gitState}`;
         this.iconPath = this.getIconForStatus(status);
+        this.contextValue = 'diffFile';
         this.command = {
             command: 'gitDiffExplorer.openDiff',
             title: 'Open Diff',
             arguments: [this]
         };
-        console.log(`[DiffFileItem] Created: label="${label}", path="${relativePath}", status="${status}"`);
+        console.log(`[DiffFileItem] Created: label="${label}", path="${relativePath}", status="${status}", gitState="${gitState}", worktree="${worktreePath}"`);
     }
 
     private getIconForStatus(status: string): vscode.ThemeIcon {
@@ -39,15 +61,18 @@ export class DiffFileItem extends vscode.TreeItem {
     }
 }
 
-export class GitDiffProvider implements vscode.TreeDataProvider<DiffFileItem> {
-    private _onDidChangeTreeData: vscode.EventEmitter<DiffFileItem | undefined | void> = new vscode.EventEmitter<DiffFileItem | undefined | void>();
-    readonly onDidChangeTreeData: vscode.Event<DiffFileItem | undefined | void> = this._onDidChangeTreeData.event;
+type TreeItem = WorktreeItem | DiffFileItem;
 
-    private diffFiles: DiffFileItem[] = [];
-    public defaultBranch: string = 'master';
+export class GitDiffProvider implements vscode.TreeDataProvider<TreeItem> {
+    private _onDidChangeTreeData: vscode.EventEmitter<TreeItem | undefined | void> = new vscode.EventEmitter<TreeItem | undefined | void>();
+    readonly onDidChangeTreeData: vscode.Event<TreeItem | undefined | void> = this._onDidChangeTreeData.event;
+
+    private worktrees: WorktreeItem[] = [];
+    private worktreeFiles: Map<string, DiffFileItem[]> = new Map();
+    public defaultBranch = 'master';
 
     constructor() {
-        this.loadDiffFiles();
+        this.loadWorktreesAndFiles();
     }
 
     public getDefaultBranch(): string {
@@ -55,29 +80,114 @@ export class GitDiffProvider implements vscode.TreeDataProvider<DiffFileItem> {
     }
 
     refresh(): void {
-        this.loadDiffFiles();
+        this.loadWorktreesAndFiles();
     }
 
-    getTreeItem(element: DiffFileItem): vscode.TreeItem {
+    getTreeItem(element: TreeItem): vscode.TreeItem {
         return element;
     }
 
-    getChildren(element?: DiffFileItem): Thenable<DiffFileItem[]> {
-        if (element) {
-            return Promise.resolve([]);
+    getChildren(element?: TreeItem): Thenable<TreeItem[]> {
+        if (!element) {
+            // Root level - return worktrees
+            return Promise.resolve(this.worktrees);
         }
-        return Promise.resolve(this.diffFiles);
+
+        if (element instanceof WorktreeItem) {
+            // Return files for this worktree
+            const files = this.worktreeFiles.get(element.worktreePath) || [];
+            return Promise.resolve(files);
+        }
+
+        // Files don't have children
+        return Promise.resolve([]);
     }
 
-    private async loadDiffFiles(): Promise<void> {
+    private async loadWorktreesAndFiles(): Promise<void> {
         const workspaceFolders = vscode.workspace.workspaceFolders;
         if (!workspaceFolders) {
-            this.diffFiles = [];
+            this.worktrees = [];
+            this.worktreeFiles.clear();
             this._onDidChangeTreeData.fire();
             return;
         }
 
         const workspaceRoot = workspaceFolders[0].uri.fsPath;
+
+        try {
+            // Get list of all worktrees
+            console.log('[GitDiffProvider] Getting worktree list...');
+            const { stdout: worktreeList } = await execAsync(
+                'git worktree list --porcelain',
+                { cwd: workspaceRoot }
+            );
+            console.log(`[GitDiffProvider] Worktree list:\n${worktreeList}`);
+
+            // Parse worktree list
+            const worktreeData: { path: string; branch: string; isMain: boolean }[] = [];
+            const lines = worktreeList.trim().split('\n');
+            let currentWorktree: { path?: string; branch?: string; isMain?: boolean } = {};
+
+            for (const line of lines) {
+                if (line.startsWith('worktree ')) {
+                    if (currentWorktree.path) {
+                        worktreeData.push({
+                            path: currentWorktree.path,
+                            branch: currentWorktree.branch || 'unknown',
+                            isMain: currentWorktree.isMain || false
+                        });
+                    }
+                    currentWorktree = { path: line.substring(9), isMain: false };
+                } else if (line.startsWith('branch ')) {
+                    currentWorktree.branch = line.substring(7).split('/').pop() || 'unknown';
+                } else if (line.startsWith('HEAD ')) {
+                    // This is the main worktree if it matches workspace root
+                    if (currentWorktree.path === workspaceRoot) {
+                        currentWorktree.isMain = true;
+                    }
+                }
+            }
+            // Add the last worktree
+            if (currentWorktree.path) {
+                worktreeData.push({
+                    path: currentWorktree.path,
+                    branch: currentWorktree.branch || 'unknown',
+                    isMain: currentWorktree.isMain || false
+                });
+            }
+
+            // Sort so main worktree is first
+            worktreeData.sort((a, b) => {
+                if (a.isMain) { return -1; }
+                if (b.isMain) { return 1; }
+                return a.path.localeCompare(b.path);
+            });
+
+            console.log(`[GitDiffProvider] Found ${worktreeData.length} worktrees`);
+
+            // Create worktree items
+            this.worktrees = worktreeData.map(wt => {
+                const label = wt.isMain ? '📁 Current Directory' : `🌿 ${wt.path.split(/[/\\]/).pop() || 'worktree'}`;
+                return new WorktreeItem(label, wt.path, wt.branch, wt.isMain);
+            });
+
+            // Load files for each worktree
+            this.worktreeFiles.clear();
+            for (const wtData of worktreeData) {
+                const files = await this.loadFilesForWorktree(wtData.path);
+                this.worktreeFiles.set(wtData.path, files);
+            }
+
+            this._onDidChangeTreeData.fire();
+        } catch (error) {
+            console.error('[GitDiffProvider] Error loading worktrees:', error);
+            this.worktrees = [];
+            this.worktreeFiles.clear();
+            this._onDidChangeTreeData.fire();
+        }
+    }
+
+    private async loadFilesForWorktree(workspaceRoot: string): Promise<DiffFileItem[]> {
 
         try {
             // Detect the default branch (main or master)
@@ -105,6 +215,51 @@ export class GitDiffProvider implements vscode.TreeDataProvider<DiffFileItem> {
             } catch (fetchError) {
                 console.error(`Failed to fetch origin/${this.defaultBranch}:`, fetchError);
             }
+
+            // Get git porcelain status to determine file states
+            console.log('[GitDiffProvider] Getting git status (porcelain)...');
+            const { stdout: porcelainStatus } = await execAsync(
+                'git status --porcelain',
+                { cwd: workspaceRoot }
+            );
+            console.log(`[GitDiffProvider] Porcelain status:\n${porcelainStatus || '(empty)'}`);
+
+            // Parse porcelain status to get git state for each file
+            const gitStateMap = new Map<string, string>();
+            porcelainStatus
+                .trim()
+                .split('\n')
+                .filter(line => line.length > 0)
+                .forEach(line => {
+                    const statusCode = line.substring(0, 2);
+                    const filePath = line.substring(3);
+
+                    let gitState = 'Unknown';
+                    if (statusCode === '??') {
+                        gitState = 'Untracked';
+                    } else if (statusCode === 'M ') {
+                        gitState = 'Staged';
+                    } else if (statusCode === ' M') {
+                        gitState = 'Unstaged';
+                    } else if (statusCode === 'MM') {
+                        gitState = 'Staged+Unstaged';
+                    } else if (statusCode === 'A ') {
+                        gitState = 'Staged';
+                    } else if (statusCode === 'AM') {
+                        gitState = 'Staged+Unstaged';
+                    } else if (statusCode === 'D ') {
+                        gitState = 'Staged (Deleted)';
+                    } else if (statusCode === ' D') {
+                        gitState = 'Unstaged (Deleted)';
+                    } else if (statusCode === 'R ') {
+                        gitState = 'Staged (Renamed)';
+                    } else if (statusCode === 'C ') {
+                        gitState = 'Staged (Copied)';
+                    }
+
+                    console.log(`[GitDiffProvider] Git state: "${filePath}" -> "${gitState}" (code: "${statusCode}")`);
+                    gitStateMap.set(filePath, gitState);
+                });
 
             // Get uncommitted changes (working directory + staged)
             console.log('[GitDiffProvider] Getting local changes...');
@@ -166,25 +321,28 @@ export class GitDiffProvider implements vscode.TreeDataProvider<DiffFileItem> {
             const files = Array.from(fileMap.values()).map(({ status, filePath }) => {
                 const fileName = filePath.split('/').pop() || filePath;
                 const statusText = this.getStatusText(status);
-                console.log(`[GitDiffProvider] Mapping: status="${status}" -> statusText="${statusText}", file="${fileName}"`);
+                const gitState = gitStateMap.get(filePath) || 'Committed';
+                const absolutePath = `${workspaceRoot}/${filePath}`.replace(/\\/g, '/');
+                console.log(`[GitDiffProvider] Mapping: status="${status}" -> statusText="${statusText}", gitState="${gitState}", file="${fileName}"`);
 
                 return new DiffFileItem(
                     fileName,
                     filePath,
+                    absolutePath,
                     statusText,
+                    gitState,
+                    workspaceRoot,
                     vscode.TreeItemCollapsibleState.None
                 );
             });
 
-            console.log(`[GitDiffProvider] Total files loaded: ${files.length}`);
-            this.diffFiles = files;
+            console.log(`[GitDiffProvider] Total files loaded for worktree: ${files.length}`);
+            return files;
         } catch (error) {
             const errorMessage = error instanceof Error ? error.message : String(error);
-            vscode.window.showErrorMessage(`Failed to get git diff: ${errorMessage}`);
-            this.diffFiles = [];
+            console.error(`Failed to get git diff for worktree ${workspaceRoot}: ${errorMessage}`);
+            return [];
         }
-
-        this._onDidChangeTreeData.fire();
     }
 
     private getStatusText(status: string): string {

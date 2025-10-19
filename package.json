@@ -2,7 +2,7 @@
   "name": "git-diff-viewer",
   "displayName": "Git Diff Viewer",
   "description": "View git diff files between HEAD and origin default branch",
-  "version": "0.0.8",
+  "version": "0.2.0",
   "publisher": "local",
   "repository": {
     "type": "git",
@@ -13,9 +13,6 @@
   },
   "categories": [
     "Other"
-  ],
-  "activationEvents": [
-    "onView:gitDiffExplorer"
   ],
   "main": "./out/extension.js",
   "contributes": {
