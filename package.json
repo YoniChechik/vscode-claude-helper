@@ -21,7 +21,7 @@
         {
           "id": "gitDiffContainer",
           "title": "Git Diff Viewer",
-          "icon": "$(git-compare)"
+          "icon": "resources/icon.svg"
         }
       ]
     },
