@@ -59,7 +59,6 @@ Click the tree/list icon to switch between:
 ## Requirements
 
 - Git must be installed and accessible in PATH
-- VS Code 1.74.0 or higher
 
 ## Known Issues
 
