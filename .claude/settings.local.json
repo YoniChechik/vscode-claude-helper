@@ -21,7 +21,8 @@
       "WebFetch(domain:code.visualstudio.com)",
       "WebFetch(domain:github.com)",
       "Bash(start /wait cmd /c install.bat)",
-      "Bash(npx @vscode/vsce package:*)"
+      "Bash(npx @vscode/vsce package:*)",
+      "Bash(git push:*)"
     ],
     "deny": [],
     "ask": []
