@@ -20,6 +20,7 @@ export class DiffFileItem extends vscode.TreeItem {
             title: 'Open Diff',
             arguments: [this]
         };
+        console.log(`[DiffFileItem] Created: label="${label}", path="${relativePath}", status="${status}"`);
     }
 
     private getIconForStatus(status: string): vscode.ThemeIcon {
@@ -43,9 +44,14 @@ export class GitDiffProvider implements vscode.TreeDataProvider<DiffFileItem> {
     readonly onDidChangeTreeData: vscode.Event<DiffFileItem | undefined | void> = this._onDidChangeTreeData.event;
 
     private diffFiles: DiffFileItem[] = [];
+    public defaultBranch: string = 'master';
 
     constructor() {
         this.loadDiffFiles();
+    }
+
+    public getDefaultBranch(): string {
+        return this.defaultBranch;
     }
 
     refresh(): void {
@@ -74,39 +80,103 @@ export class GitDiffProvider implements vscode.TreeDataProvider<DiffFileItem> {
         const workspaceRoot = workspaceFolders[0].uri.fsPath;
 
         try {
-            // First fetch to ensure we have latest origin/main
+            // Detect the default branch (main or master)
             try {
-                await execAsync('git fetch origin main', { cwd: workspaceRoot });
-            } catch (fetchError) {
-                console.error('Failed to fetch origin/main:', fetchError);
+                const { stdout: branchOutput } = await execAsync(
+                    'git symbolic-ref refs/remotes/origin/HEAD',
+                    { cwd: workspaceRoot }
+                );
+                // Extract branch name from refs/remotes/origin/main or refs/remotes/origin/master
+                this.defaultBranch = branchOutput.trim().split('/').pop() || 'main';
+            } catch (branchError) {
+                // If symbolic-ref fails, try to detect if origin/master exists
+                try {
+                    await execAsync('git rev-parse --verify origin/master', { cwd: workspaceRoot });
+                    this.defaultBranch = 'master';
+                } catch {
+                    // Fallback to main
+                    this.defaultBranch = 'main';
+                }
             }
 
-            // Get diff between HEAD and origin/main
-            const { stdout } = await execAsync(
-                'git diff --name-status HEAD origin/main',
+            // First fetch to ensure we have latest origin branch
+            try {
+                await execAsync(`git fetch origin ${this.defaultBranch}`, { cwd: workspaceRoot });
+            } catch (fetchError) {
+                console.error(`Failed to fetch origin/${this.defaultBranch}:`, fetchError);
+            }
+
+            // Get uncommitted changes (working directory + staged)
+            console.log('[GitDiffProvider] Getting local changes...');
+            const { stdout: localChanges } = await execAsync(
+                'git diff --name-status HEAD',
                 { cwd: workspaceRoot }
             );
+            console.log(`[GitDiffProvider] Local changes:\n${localChanges || '(empty)'}`);
 
-            const files = stdout
+            // Get untracked files
+            console.log('[GitDiffProvider] Getting untracked files...');
+            const { stdout: untrackedFiles } = await execAsync(
+                'git ls-files --others --exclude-standard',
+                { cwd: workspaceRoot }
+            );
+            console.log(`[GitDiffProvider] Untracked files:\n${untrackedFiles || '(empty)'}`);
+
+            // Format untracked files as "A" (added) status
+            const formattedUntracked = untrackedFiles
                 .trim()
                 .split('\n')
                 .filter(line => line.length > 0)
-                .map(line => {
+                .map(file => `A\t${file}`)
+                .join('\n');
+            console.log(`[GitDiffProvider] Formatted untracked:\n${formattedUntracked || '(empty)'}`);
+
+            // Get diff between HEAD and origin/defaultBranch
+            console.log(`[GitDiffProvider] Getting remote changes vs origin/${this.defaultBranch}...`);
+            const { stdout: remoteChanges } = await execAsync(
+                `git diff --name-status HEAD origin/${this.defaultBranch}`,
+                { cwd: workspaceRoot }
+            );
+            console.log(`[GitDiffProvider] Remote changes:\n${remoteChanges || '(empty)'}`);
+
+            // Combine all diffs, removing duplicates
+            const allChanges = (localChanges + '\n' + formattedUntracked + '\n' + remoteChanges).trim();
+            console.log(`[GitDiffProvider] All combined changes:\n${allChanges}`);
+            const fileMap = new Map<string, { status: string, filePath: string }>();
+
+            allChanges
+                .split('\n')
+                .filter(line => line.length > 0)
+                .forEach(line => {
                     const parts = line.split('\t');
                     const status = parts[0];
                     const filePath = parts[1];
-                    const fileName = filePath.split('/').pop() || filePath;
+                    console.log(`[GitDiffProvider] Processing line: status="${status}", filePath="${filePath}"`);
 
-                    const statusText = this.getStatusText(status);
-
-                    return new DiffFileItem(
-                        fileName,
-                        filePath,
-                        statusText,
-                        vscode.TreeItemCollapsibleState.None
-                    );
+                    // Keep the first occurrence (local changes take priority)
+                    if (!fileMap.has(filePath)) {
+                        fileMap.set(filePath, { status, filePath });
+                        console.log(`[GitDiffProvider] Added to map: ${filePath}`);
+                    } else {
+                        console.log(`[GitDiffProvider] Skipped duplicate: ${filePath}`);
+                    }
                 });
 
+            console.log(`[GitDiffProvider] Creating DiffFileItem objects from ${fileMap.size} files...`);
+            const files = Array.from(fileMap.values()).map(({ status, filePath }) => {
+                const fileName = filePath.split('/').pop() || filePath;
+                const statusText = this.getStatusText(status);
+                console.log(`[GitDiffProvider] Mapping: status="${status}" -> statusText="${statusText}", file="${fileName}"`);
+
+                return new DiffFileItem(
+                    fileName,
+                    filePath,
+                    statusText,
+                    vscode.TreeItemCollapsibleState.None
+                );
+            });
+
+            console.log(`[GitDiffProvider] Total files loaded: ${files.length}`);
             this.diffFiles = files;
         } catch (error) {
             const errorMessage = error instanceof Error ? error.message : String(error);

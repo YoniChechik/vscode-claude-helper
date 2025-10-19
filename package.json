@@ -1,8 +1,8 @@
 {
   "name": "git-diff-viewer",
   "displayName": "Git Diff Viewer",
-  "description": "View git diff files between HEAD and origin/main",
-  "version": "0.0.1",
+  "description": "View git diff files between HEAD and origin default branch",
+  "version": "0.0.8",
   "publisher": "local",
   "repository": {
     "type": "git",
@@ -32,7 +32,7 @@
       "gitDiffContainer": [
         {
           "id": "gitDiffExplorer",
-          "name": "Git Diff (HEAD vs origin/main)"
+          "name": "Git Diff (HEAD vs origin)"
         }
       ]
     },
