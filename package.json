@@ -29,7 +29,8 @@
       "gitDiffContainer": [
         {
           "id": "gitDiffExplorer",
-          "name": "Git Diff (HEAD vs origin)"
+          "name": "Git Diff (HEAD vs origin)",
+          "icon": "resources/icon.svg"
         }
       ]
     },
