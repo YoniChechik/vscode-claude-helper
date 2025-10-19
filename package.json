@@ -1,8 +1,8 @@
 {
   "name": "git-diff-viewer",
-  "displayName": "Git Diff Viewer",
-  "description": "View git diff files between HEAD and origin default branch",
-  "version": "0.2.0",
+  "displayName": "Git Diff",
+  "description": "View git diff files",
+  "version": "0.5.6",
   "publisher": "local",
   "repository": {
     "type": "git",
@@ -20,7 +20,7 @@
       "activitybar": [
         {
           "id": "gitDiffContainer",
-          "title": "Git Diff Viewer",
+          "title": "Git Diff",
           "icon": "resources/icon.svg"
         }
       ]
@@ -29,7 +29,7 @@
       "gitDiffContainer": [
         {
           "id": "gitDiffExplorer",
-          "name": "Git Diff (HEAD vs origin)",
+          "name": "Changes",
           "icon": "resources/icon.svg"
         }
       ]
@@ -43,12 +43,32 @@
       {
         "command": "gitDiffExplorer.openDiff",
         "title": "Open Diff"
+      },
+      {
+        "command": "gitDiffExplorer.changeComparisonTarget",
+        "title": "Change Comparison Target",
+        "icon": "$(git-compare)"
+      },
+      {
+        "command": "gitDiffExplorer.toggleViewMode",
+        "title": "Toggle View as Tree / List",
+        "icon": "$(list-tree)"
       }
     ],
     "menus": {
       "view/title": [
         {
           "command": "gitDiffExplorer.refresh",
+          "when": "view == gitDiffExplorer",
+          "group": "navigation"
+        },
+        {
+          "command": "gitDiffExplorer.toggleViewMode",
+          "when": "view == gitDiffExplorer",
+          "group": "navigation"
+        },
+        {
+          "command": "gitDiffExplorer.changeComparisonTarget",
           "when": "view == gitDiffExplorer",
           "group": "navigation"
         }

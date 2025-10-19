@@ -21,6 +21,21 @@ export class WorktreeItem extends vscode.TreeItem {
     }
 }
 
+// Represents a folder in the tree view
+export class FolderItem extends vscode.TreeItem {
+    constructor(
+        public readonly label: string,
+        public readonly fullPath: string,
+        public readonly worktreePath: string,
+        public readonly children: (FolderItem | DiffFileItem)[]
+    ) {
+        super(label, vscode.TreeItemCollapsibleState.Expanded);
+        this.tooltip = fullPath;
+        this.iconPath = vscode.ThemeIcon.Folder;
+        this.contextValue = 'folder';
+    }
+}
+
 // Represents a file with changes
 export class DiffFileItem extends vscode.TreeItem {
     constructor(
@@ -61,7 +76,9 @@ export class DiffFileItem extends vscode.TreeItem {
     }
 }
 
-type TreeItem = WorktreeItem | DiffFileItem;
+type TreeItem = WorktreeItem | FolderItem | DiffFileItem;
+
+type ViewMode = 'tree' | 'list';
 
 export class GitDiffProvider implements vscode.TreeDataProvider<TreeItem> {
     private _onDidChangeTreeData: vscode.EventEmitter<TreeItem | undefined | void> = new vscode.EventEmitter<TreeItem | undefined | void>();
@@ -69,7 +86,10 @@ export class GitDiffProvider implements vscode.TreeDataProvider<TreeItem> {
 
     private worktrees: WorktreeItem[] = [];
     private worktreeFiles: Map<string, DiffFileItem[]> = new Map();
+    private worktreeTrees: Map<string, (FolderItem | DiffFileItem)[]> = new Map(); // Tree structure for each worktree
     public defaultBranch = 'master';
+    private comparisonTarget: string | null = null; // null means use origin/defaultBranch
+    private viewMode: ViewMode = 'tree'; // default to tree view
 
     constructor() {
         this.loadWorktreesAndFiles();
@@ -77,6 +97,28 @@ export class GitDiffProvider implements vscode.TreeDataProvider<TreeItem> {
 
     public getDefaultBranch(): string {
         return this.defaultBranch;
+    }
+
+    public getComparisonTarget(): string {
+        return this.comparisonTarget || `origin/${this.defaultBranch}`;
+    }
+
+    public setComparisonTarget(target: string): void {
+        this.comparisonTarget = target;
+    }
+
+    public getViewMode(): ViewMode {
+        return this.viewMode;
+    }
+
+    public setViewMode(mode: ViewMode): void {
+        this.viewMode = mode;
+        this._onDidChangeTreeData.fire();
+    }
+
+    public toggleViewMode(): void {
+        this.viewMode = this.viewMode === 'tree' ? 'list' : 'tree';
+        this._onDidChangeTreeData.fire();
     }
 
     refresh(): void {
@@ -89,18 +131,71 @@ export class GitDiffProvider implements vscode.TreeDataProvider<TreeItem> {
 
     getChildren(element?: TreeItem): Thenable<TreeItem[]> {
         if (!element) {
-            // Root level - return worktrees
+            // Root level - always show worktrees
             return Promise.resolve(this.worktrees);
         }
 
         if (element instanceof WorktreeItem) {
-            // Return files for this worktree
-            const files = this.worktreeFiles.get(element.worktreePath) || [];
-            return Promise.resolve(files);
+            if (this.viewMode === 'list') {
+                // List view: flat list of files
+                const files = this.worktreeFiles.get(element.worktreePath) || [];
+                return Promise.resolve(files);
+            } else {
+                // Tree view: directory structure
+                const tree = this.worktreeTrees.get(element.worktreePath) || [];
+                return Promise.resolve(tree);
+            }
+        }
+
+        if (element instanceof FolderItem) {
+            // Return children of this folder
+            return Promise.resolve(element.children);
         }
 
         // Files don't have children
         return Promise.resolve([]);
+    }
+
+    private buildDirectoryTree(files: DiffFileItem[], worktreePath: string): (FolderItem | DiffFileItem)[] {
+        // Group files by their immediate parent directory
+        const pathMap = new Map<string, DiffFileItem[]>();
+
+        for (const file of files) {
+            const pathParts = file.relativePath.split('/');
+            if (pathParts.length === 1) {
+                // Root level file
+                if (!pathMap.has('')) {
+                    pathMap.set('', []);
+                }
+                pathMap.get('')!.push(file);
+            } else {
+                // File in subdirectory - use first directory as key
+                const firstDir = pathParts[0];
+                if (!pathMap.has(firstDir)) {
+                    pathMap.set(firstDir, []);
+                }
+                pathMap.get(firstDir)!.push(file);
+            }
+        }
+
+        // Build tree
+        const result: (FolderItem | DiffFileItem)[] = [];
+
+        // Add root-level files first
+        const rootFiles = pathMap.get('') || [];
+        result.push(...rootFiles);
+
+        // Add folders with their contents
+        for (const [dirName, dirFiles] of pathMap.entries()) {
+            if (dirName === '') {continue;} // Skip root files, already added
+
+            // For simplicity, just show first-level folders
+            // Files within those folders are flattened
+            const folderItem = new FolderItem(dirName, dirName, worktreePath, dirFiles);
+            result.push(folderItem);
+        }
+
+        return result;
     }
 
     private async loadWorktreesAndFiles(): Promise<void> {
@@ -167,15 +262,20 @@ export class GitDiffProvider implements vscode.TreeDataProvider<TreeItem> {
 
             // Create worktree items
             this.worktrees = worktreeData.map(wt => {
-                const label = wt.isMain ? '📁 Current Directory' : `🌿 ${wt.path.split(/[/\\]/).pop() || 'worktree'}`;
+                const label = wt.isMain ? wt.branch : (wt.path.split(/[/\\]/).pop() || 'worktree');
                 return new WorktreeItem(label, wt.path, wt.branch, wt.isMain);
             });
 
             // Load files for each worktree
             this.worktreeFiles.clear();
+            this.worktreeTrees.clear();
             for (const wtData of worktreeData) {
                 const files = await this.loadFilesForWorktree(wtData.path);
                 this.worktreeFiles.set(wtData.path, files);
+
+                // Build directory tree for each worktree
+                const tree = this.buildDirectoryTree(files, wtData.path);
+                this.worktreeTrees.set(wtData.path, tree);
             }
 
             this._onDidChangeTreeData.fire();
@@ -286,10 +386,11 @@ export class GitDiffProvider implements vscode.TreeDataProvider<TreeItem> {
                 .join('\n');
             console.log(`[GitDiffProvider] Formatted untracked:\n${formattedUntracked || '(empty)'}`);
 
-            // Get diff between HEAD and origin/defaultBranch
-            console.log(`[GitDiffProvider] Getting remote changes vs origin/${this.defaultBranch}...`);
+            // Get diff between HEAD and comparison target
+            const comparisonTarget = this.getComparisonTarget();
+            console.log(`[GitDiffProvider] Getting remote changes vs ${comparisonTarget}...`);
             const { stdout: remoteChanges } = await execAsync(
-                `git diff --name-status HEAD origin/${this.defaultBranch}`,
+                `git diff --name-status HEAD ${comparisonTarget}`,
                 { cwd: workspaceRoot }
             );
             console.log(`[GitDiffProvider] Remote changes:\n${remoteChanges || '(empty)'}`);
@@ -318,23 +419,44 @@ export class GitDiffProvider implements vscode.TreeDataProvider<TreeItem> {
                 });
 
             console.log(`[GitDiffProvider] Creating DiffFileItem objects from ${fileMap.size} files...`);
-            const files = Array.from(fileMap.values()).map(({ status, filePath }) => {
-                const fileName = filePath.split('/').pop() || filePath;
-                const statusText = this.getStatusText(status);
-                const gitState = gitStateMap.get(filePath) || 'Committed';
-                const absolutePath = `${workspaceRoot}/${filePath}`.replace(/\\/g, '/');
-                console.log(`[GitDiffProvider] Mapping: status="${status}" -> statusText="${statusText}", gitState="${gitState}", file="${fileName}"`);
+            const files = Array.from(fileMap.values())
+                .filter(({ status, filePath }) => {
+                    // Skip files that are deleted in working tree or have status D
+                    const gitStatusCode = gitStateMap.get(filePath);
 
-                return new DiffFileItem(
-                    fileName,
-                    filePath,
-                    absolutePath,
-                    statusText,
-                    gitState,
-                    workspaceRoot,
-                    vscode.TreeItemCollapsibleState.None
-                );
-            });
+                    console.log(`[GitDiffProvider] Checking file: ${filePath}, status="${status}", gitState="${gitStatusCode}"`);
+
+                    // If status is D (deleted), skip it
+                    if (status === 'D') {
+                        console.log(`[GitDiffProvider] Skipping file with status D: ${filePath}`);
+                        return false;
+                    }
+
+                    // If git state contains "Deleted", skip it
+                    if (gitStatusCode && gitStatusCode.includes('Deleted')) {
+                        console.log(`[GitDiffProvider] Skipping file with Deleted state: ${filePath}`);
+                        return false;
+                    }
+
+                    return true;
+                })
+                .map(({ status, filePath }) => {
+                    const fileName = filePath.split('/').pop() || filePath;
+                    const statusText = this.getStatusText(status);
+                    const gitState = gitStateMap.get(filePath) || 'Committed';
+                    const absolutePath = `${workspaceRoot}/${filePath}`.replace(/\\/g, '/');
+                    console.log(`[GitDiffProvider] Mapping: status="${status}" -> statusText="${statusText}", gitState="${gitState}", file="${fileName}"`);
+
+                    return new DiffFileItem(
+                        fileName,
+                        filePath,
+                        absolutePath,
+                        statusText,
+                        gitState,
+                        workspaceRoot,
+                        vscode.TreeItemCollapsibleState.None
+                    );
+                });
 
             console.log(`[GitDiffProvider] Total files loaded for worktree: ${files.length}`);
             return files;
