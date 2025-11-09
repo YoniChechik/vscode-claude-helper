@@ -37,7 +37,7 @@ These patterns mask errors and delay bug discovery. Avoid them:
 - **Avoid nested ifs**: Prefer early returns and `if not: continue` style to reduce nesting depth
 - **Private functions and classes**: Start with `_`
 - **No docstrings**: Function names should be self-explanatory. Comments only on hard logic
-- **No relative imports**: Always use absolute imports (e.g., `from algo_trading.screening.utils import ...`, not `from .utils import ...`)
+- **No relative imports**: Always use absolute imports (e.g., `from some_package.utils import ...`, not `from .utils import ...`)
 - **No lint ignore rules**: Never add rules to `lint.ignore` in pyproject.toml. Fix the code instead
 - **No noqa comments**: Don't use `# noqa` to suppress warnings, except for undefined types from external libraries (e.g., `# type: ignore[import-untyped]`)
 - **String formatting**: Always prefer f-strings over `.format()` or `%` formatting (e.g., `f"Hello {name}"`, not `"Hello {}".format(name)`)

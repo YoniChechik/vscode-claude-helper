@@ -31,7 +31,7 @@ services:
       target: dev
     volumes:
       - "/home/yoni/.ssh:/root/.ssh" # for push and pull
-      - "/home/yoni/algo_trading:/root/algo_trading" # mount main repository (contains worktrees inside)
+      - "/home/yoni/vscode-git-diff-extension:/root/vscode-git-diff-extension" # mount main repository (contains worktrees inside)
       - "/home/yoni/.vscode-server:/root/.vscode-server" # vscode remote settings
       - "/home/yoni/.cursor-server:/root/.cursor-server" # cursor remote settings
       - "/home/yoni/.claude:/home/node/.claude" # claude settings

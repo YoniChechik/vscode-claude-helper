@@ -14,7 +14,7 @@ set -e
 DOCKER_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 REPO_ROOT="$(dirname "$DOCKER_DIR")"
 
-CONTAINER_NAME="algo_trading-dev-$(date +%Y%m%d-%H%M%S)"
+CONTAINER_NAME="vscode-git-diff-extension-dev-$(date +%Y%m%d-%H%M%S)"
 
 # Check if this script has been changed in origin/main
 if git rev-parse --git-dir >/dev/null 2>&1; then

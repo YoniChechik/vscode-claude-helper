@@ -11,7 +11,7 @@ fi
 set -e
 
 # Get the most recently created container ID (including stopped)
-LATEST_CONTAINER=$(docker ps -a -q --latest)
+LATEST_CONTAINER=$(docker ps -a --format '{{.Names}}\t{{.ID}}' | grep '^vscode-git-diff-extension-dev-' | head -n 1 | cut -f2)
 
 if [ -z "$LATEST_CONTAINER" ]; then
     echo "No containers found."
