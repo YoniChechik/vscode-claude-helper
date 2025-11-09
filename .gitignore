@@ -3,3 +3,7 @@ out/
 *.vsix
 .vscode-test/
 worktrees/
+
+# CLI Bridge files
+.gitlens-cli
+.gitlens-cli-result

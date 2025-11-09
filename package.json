@@ -1,8 +1,8 @@
 {
-  "name": "git-diff-viewer",
-  "displayName": "Git Diff Viewer",
-  "description": "Compare git changes across branches, worktrees, and commits with a clean tree view",
-  "version": "0.6.0",
+  "name": "gitlens-cli-bridge",
+  "displayName": "GitLens CLI Bridge",
+  "description": "Run GitLens compare commands from the CLI",
+  "version": "1.0.0",
   "publisher": "YoniChechik",
   "author": {
     "name": "Yoni Chechik"
@@ -17,12 +17,11 @@
   },
   "homepage": "https://github.com/YoniChechik/vscode-git-diff-extension#readme",
   "keywords": [
+    "gitlens",
+    "cli",
     "git",
-    "diff",
     "compare",
-    "branches",
-    "worktree",
-    "source control"
+    "branches"
   ],
   "engines": {
     "vscode": "^1.75.0"
@@ -30,67 +29,16 @@
   "categories": [
     "Other"
   ],
-  "activationEvents": [],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
   "main": "./out/extension.js",
-  "contributes": {
-    "viewsContainers": {
-      "activitybar": [
-        {
-          "id": "gitDiffContainer",
-          "title": "Git Diff",
-          "icon": "resources/icon.svg"
-        }
-      ]
-    },
-    "views": {
-      "gitDiffContainer": [
-        {
-          "id": "gitDiffExplorer",
-          "name": "Changes",
-          "icon": "resources/icon.svg"
-        }
-      ]
-    },
-    "commands": [
-      {
-        "command": "gitDiffExplorer.refresh",
-        "title": "Refresh",
-        "icon": "$(refresh)"
-      },
-      {
-        "command": "gitDiffExplorer.openDiff",
-        "title": "Open Diff"
-      },
-      {
-        "command": "gitDiffExplorer.changeComparisonTarget",
-        "title": "Change Comparison Target",
-        "icon": "$(git-compare)"
-      },
-      {
-        "command": "gitDiffExplorer.toggleViewMode",
-        "title": "Toggle View as Tree / List",
-        "icon": "$(list-tree)"
-      }
-    ],
-    "menus": {
-      "view/title": [
-        {
-          "command": "gitDiffExplorer.refresh",
-          "when": "view == gitDiffExplorer",
-          "group": "navigation"
-        },
-        {
-          "command": "gitDiffExplorer.toggleViewMode",
-          "when": "view == gitDiffExplorer",
-          "group": "navigation"
-        },
-        {
-          "command": "gitDiffExplorer.changeComparisonTarget",
-          "when": "view == gitDiffExplorer",
-          "group": "navigation"
-        }
-      ]
-    }
+  "contributes": {},
+  "extensionDependencies": [
+    "eamodio.gitlens"
+  ],
+  "bin": {
+    "gitlens": "./bin/gitlens-cli.js"
   },
   "scripts": {
     "vscode:prepublish": "npm run compile",

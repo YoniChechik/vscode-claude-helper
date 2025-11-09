@@ -1,94 +1,145 @@
-# Git Diff Viewer
+# GitLens CLI Bridge
 
-A powerful VS Code extension that helps you visualize and compare git changes across branches, worktrees, and commits with a clean, organized tree view.
+Run GitLens compare commands from the command line! This extension bridges the CLI with VS Code's GitLens extension, allowing you to trigger comparison views from your terminal.
 
 ## Features
 
-✨ **Flexible Comparison**
-- Compare any two branches, tags, or commits
-- Support for git worktrees - view changes across multiple working directories
-- Compare working tree changes against any remote or local branch
-
-🌳 **Smart Tree View**
-- **Tree Mode**: View files organized by directory structure
-- **List Mode**: View all files in a flat list
-- Collapsible worktree sections for multi-worktree repositories
-- Auto-refresh every second to stay up-to-date
-
-🎨 **Clean Interface**
-- Color-coded status indicators (Modified, Added, Deleted)
-- Simple, uncluttered file display
-- Click any file to open side-by-side diff
-- Intuitive icons and visual feedback
-
-⚡ **Powerful Features**
-- Two-stage comparison target selection
-- Includes untracked files in comparisons
-- Support for both origin/main and origin/master
-- Automatic git fetch to ensure latest remote state
-
-## Installation
-
-1. Open VS Code
-2. Go to Extensions (Ctrl+Shift+X / Cmd+Shift+X)
-3. Search for "Git Diff Viewer"
-4. Click Install
-
-## Usage
-
-### Basic Usage
-
-1. Open a git repository in VS Code
-2. Look for the "Git Diff" icon in the Activity Bar (left sidebar)
-3. View your changes organized by worktree and directory
-4. Click any file to see the diff
-
-### Changing Comparison Target
-
-1. Click the comparison icon in the view toolbar
-2. **Step 1**: Select source (Working Tree, HEAD, or worktree HEAD)
-3. **Step 2**: Select target (any branch, tag, or remote)
-4. View changes between your selected source and target
-
-### Toggle View Mode
-
-Click the tree/list icon to switch between:
-- **Tree View**: Files organized by folder structure
-- **List View**: All files in a flat list
+- **Compare References**: Compare any two git references (branches, tags, commits)
+- **Compare HEAD**: Compare HEAD with any reference
+- Works with GitLens's powerful comparison views
+- Simple CLI interface
 
 ## Requirements
 
-- Git must be installed and accessible in PATH
+1. **VS Code** must be installed
+2. **GitLens extension** must be installed (`eamodio.gitlens`)
+3. **Node.js** must be installed
+4. **VS Code must be open** with your workspace
 
-## Known Issues
+## Installation
 
-None at this time. Please report issues on [GitHub](https://github.com/YoniChechik/vscode-git-diff-extension/issues).
+### 1. Install the Extension
 
-## Release Notes
+Open this folder in VS Code and press `F5` to run in development mode, or package and install:
 
-### 0.6.0
+```bash
+# Package the extension
+npx @vscode/vsce package
 
-- **Modularized codebase**: Split into gitOperations, treeItems, and treeBuilder modules
-- **Simplified UI**: Cleaner titles and status display
-- **Improved maintainability**: Reduced code duplication
+# Install the .vsix file in VS Code
+code --install-extension gitlens-cli-bridge-1.0.0.vsix
+```
 
-### 0.5.x
+### 2. Install the CLI Tool
 
-- Added worktree support with hierarchical tree view
-- Two-stage comparison target selection
-- Tree/List view toggle
-- Auto-refresh every 1 second
-- Support for untracked files
-- Cross-platform compatibility (Windows, Mac, Linux)
+```bash
+# From this directory
+npm link
+```
 
-### 0.0.1
+This makes the `gitlens` command available globally.
 
-- Initial release
-- Basic git diff viewing between HEAD and origin/main
+## Usage
 
-## Contributing
+**Important**: VS Code must be open with your workspace before running these commands!
 
-Contributions are welcome! Please visit the [GitHub repository](https://github.com/YoniChechik/vscode-git-diff-extension) to report issues or submit pull requests.
+### Compare Two References
+
+```bash
+gitlens compare <ref1> <ref2>
+```
+
+Examples:
+```bash
+# Compare two branches
+gitlens compare main feature-branch
+
+# Compare with remote branches
+gitlens compare origin/main HEAD
+
+# Compare tags
+gitlens compare v1.0.0 v2.0.0
+
+# Compare commits
+gitlens compare abc123 def456
+```
+
+### Compare HEAD with Reference
+
+```bash
+gitlens compare-head <ref>
+```
+
+Examples:
+```bash
+# Compare HEAD with main
+gitlens compare-head main
+
+# Compare HEAD with remote branch
+gitlens compare-head origin/main
+
+# Compare HEAD with a tag
+gitlens compare-head v1.0.0
+```
+
+### Get Help
+
+```bash
+gitlens --help
+```
+
+## How It Works
+
+The tool uses a file-based IPC mechanism:
+
+1. **CLI tool** writes a command file (`.gitlens-cli`) in your workspace root
+2. **VS Code extension** watches for this file and executes the GitLens command
+3. **Extension** writes the result to `.gitlens-cli-result`
+4. **CLI tool** reads the result and displays it
+
+This approach works because:
+- VS Code extensions can watch file system changes
+- CLI tools can easily read/write files
+- No complex IPC or socket communication needed
+
+## Development
+
+### Project Structure
+
+```
+├── src/
+│   └── extension.ts      # VS Code extension (file watcher + GitLens bridge)
+├── bin/
+│   └── gitlens-cli.js    # CLI tool (writes commands, reads results)
+└── package.json          # Extension + CLI configuration
+```
+
+### Building
+
+```bash
+npm run compile
+```
+
+### Testing
+
+1. Open VS Code with a git repository
+2. Press F5 to launch extension in development mode
+3. In a terminal, navigate to that repository
+4. Run `gitlens compare main HEAD`
+
+## Troubleshooting
+
+### "Not in a git repository"
+Make sure you're running the command from within a git repository.
+
+### "Timeout waiting for VS Code"
+- Ensure VS Code is open with the workspace
+- Ensure the extension is installed and activated
+- Check VS Code's "GitLens CLI Bridge" output panel for errors
+
+### "GitLens command failed"
+- Ensure GitLens extension is installed
+- Try running the comparison manually from VS Code first to verify GitLens works
 
 ## License
 
@@ -96,4 +147,4 @@ MIT License - see LICENSE.txt for details
 
 ---
 
-**Enjoy comparing your git changes!** 🚀
+**Enjoy comparing from the command line!**

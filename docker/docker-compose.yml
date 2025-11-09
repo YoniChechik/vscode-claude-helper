@@ -1,0 +1,38 @@
+x-default: &default
+  # expose all ports to the outside world as if we are the host machine
+  network_mode: host
+  # don't disconnect gpu after several hours/days with NVML error
+  # From: https://bbs.archlinux.org/viewtopic.php?id=266915
+  privileged: true 
+  # GPU
+  deploy:
+    resources:
+      reservations:
+        devices:
+        - driver: nvidia
+          count: all
+          # device_ids: ['0']
+          capabilities: [gpu]
+  # shared memory
+  shm_size: '12gb'
+
+x-build: &build
+  # Build context is repository root (parent of docker/ directory)
+  # Dockerfile path relative to context: docker/Dockerfile
+  context: ..
+  # Path to dockerfile relative to context
+  dockerfile: docker/Dockerfile
+
+services:
+  dev:
+    <<: *default
+    build:
+      <<: *build
+      target: dev
+    volumes:
+      - "/home/yoni/.ssh:/root/.ssh" # for push and pull
+      - "/home/yoni/algo_trading:/root/algo_trading" # mount main repository (contains worktrees inside)
+      - "/home/yoni/.vscode-server:/root/.vscode-server" # vscode remote settings
+      - "/home/yoni/.cursor-server:/root/.cursor-server" # cursor remote settings
+      - "/home/yoni/.claude:/home/node/.claude" # claude settings
+      - "/home/yoni/.config/gh:/root/.config/gh" # github cli settings

@@ -1,313 +1,233 @@
 import * as vscode from 'vscode';
-import { GitDiffProvider, DiffFileItem } from './gitDiffProvider';
-import { GitOperations } from './gitOperations';
-import { exec } from 'child_process';
-import { promisify } from 'util';
+import * as fs from 'fs';
+import * as path from 'path';
 
-const execAsync = promisify(exec);
-const gitOps = new GitOperations();
+const CLI_COMMAND_FILE = '.gitlens-cli';
+const CLI_RESULT_FILE = '.gitlens-cli-result';
 
-let outputChannel: vscode.OutputChannel;
-let autoRefreshTimer: NodeJS.Timeout | undefined;
+interface CliCommand {
+    command: 'compareReferences' | 'compareHead';
+    args: string[];
+    timestamp: number;
+}
 
-// Empty file content provider for showing diffs against empty files
-class EmptyFileContentProvider implements vscode.TextDocumentContentProvider {
-    provideTextDocumentContent(_uri: vscode.Uri): string {
-        return ''; // Always return empty content
-    }
+interface CliResult {
+    success: boolean;
+    message: string;
+    error?: string;
 }
 
 export function activate(context: vscode.ExtensionContext) {
-    outputChannel = vscode.window.createOutputChannel('Git Diff Viewer');
-    outputChannel.appendLine('Git Diff Viewer extension activated');
+    console.log('GitLens CLI Bridge is now active');
 
-    // Register empty file content provider
-    const emptyContentProvider = new EmptyFileContentProvider();
-    context.subscriptions.push(
-        vscode.workspace.registerTextDocumentContentProvider('empty', emptyContentProvider)
+    // Get workspace root
+    const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+    if (!workspaceRoot) {
+        console.log('No workspace folder found');
+        return;
+    }
+
+    const commandFilePath = path.join(workspaceRoot, CLI_COMMAND_FILE);
+    const resultFilePath = path.join(workspaceRoot, CLI_RESULT_FILE);
+
+    // Watch for CLI command file
+    const watcher = vscode.workspace.createFileSystemWatcher(
+        new vscode.RelativePattern(workspaceRoot, CLI_COMMAND_FILE)
     );
-    outputChannel.appendLine('Empty content provider registered');
 
-    const gitDiffProvider = new GitDiffProvider();
-
-    vscode.window.registerTreeDataProvider('gitDiffExplorer', gitDiffProvider);
-
-    vscode.commands.registerCommand('gitDiffExplorer.refresh', () => {
-        outputChannel.appendLine('Refresh command triggered (manual)');
-        gitDiffProvider.refresh();
+    watcher.onDidCreate(async () => {
+        console.log('CLI command file detected');
+        await processCliCommand(commandFilePath, resultFilePath);
     });
 
-    vscode.commands.registerCommand('gitDiffExplorer.toggleViewMode', () => {
-        gitDiffProvider.toggleViewMode();
-        const newMode = gitDiffProvider.getViewMode();
-        outputChannel.appendLine(`View mode toggled to: ${newMode}`);
-        vscode.window.showInformationMessage(`View mode: ${newMode === 'tree' ? 'Tree' : 'List'}`);
+    watcher.onDidChange(async () => {
+        console.log('CLI command file changed');
+        await processCliCommand(commandFilePath, resultFilePath);
     });
 
-    // Auto-refresh every 1 second
-    outputChannel.appendLine('Starting auto-refresh timer (1 second interval)');
-    autoRefreshTimer = setInterval(() => {
-        gitDiffProvider.refresh();
-    }, 1000);
-    outputChannel.appendLine('Auto-refresh timer started');
+    context.subscriptions.push(watcher);
 
-    vscode.commands.registerCommand('gitDiffExplorer.openDiff', async (item: DiffFileItem) => {
-        outputChannel.appendLine('=================================================');
-        outputChannel.appendLine('=== Open Diff Command TRIGGERED ===');
-        outputChannel.appendLine('=================================================');
-        outputChannel.show();
+    // Also check if file exists on activation
+    if (fs.existsSync(commandFilePath)) {
+        processCliCommand(commandFilePath, resultFilePath);
+    }
+}
 
-        outputChannel.appendLine(`Item: ${item.label}`);
-        outputChannel.appendLine(`Status: ${item.status}`);
-        outputChannel.appendLine(`Path: ${item.relativePath}`);
-        outputChannel.appendLine(`Git state: ${item.gitState}`);
+async function processCliCommand(commandFilePath: string, resultFilePath: string) {
+    try {
+        // Read command file
+        const commandData = fs.readFileSync(commandFilePath, 'utf8');
+        const command: CliCommand = JSON.parse(commandData);
 
-        if (!item) {
-            const error = 'ERROR: No item provided';
-            outputChannel.appendLine(error);
-            vscode.window.showErrorMessage(error);
-            throw new Error(error);
+        console.log('Processing command:', command);
+
+        let result: CliResult;
+
+        switch (command.command) {
+            case 'compareReferences':
+                result = await executeCompareReferences(command.args);
+                break;
+            case 'compareHead':
+                result = await executeCompareHead(command.args);
+                break;
+            default:
+                result = {
+                    success: false,
+                    message: '',
+                    error: `Unknown command: ${command.command}`
+                };
         }
 
-        const fileUri = vscode.Uri.file(item.absolutePath);
-        const comparisonTarget = gitDiffProvider.getComparisonTarget();
-        outputChannel.appendLine(`Comparison target: ${comparisonTarget}`);
+        // Write result
+        fs.writeFileSync(resultFilePath, JSON.stringify(result, null, 2));
 
-        const workspaceFolders = vscode.workspace.workspaceFolders;
-        if (!workspaceFolders) {
-            const error = 'ERROR: No workspace folder open';
-            outputChannel.appendLine(error);
-            vscode.window.showErrorMessage(error);
-            throw new Error(error);
+        // Delete command file
+        fs.unlinkSync(commandFilePath);
+
+    } catch (error) {
+        console.error('Error processing CLI command:', error);
+        const errorResult: CliResult = {
+            success: false,
+            message: '',
+            error: error instanceof Error ? error.message : String(error)
+        };
+        fs.writeFileSync(resultFilePath, JSON.stringify(errorResult, null, 2));
+
+        // Try to delete command file
+        try {
+            fs.unlinkSync(commandFilePath);
+        } catch (e) {
+            console.error('Failed to delete command file:', e);
         }
+    }
+}
 
-        // ADDED FILES: Show diff from empty to working tree
-        if (item.status === 'Added') {
-            outputChannel.appendLine('Opening ADDED file diff: empty → working tree');
+async function executeCompareReferences(args: string[]): Promise<CliResult> {
+    if (args.length < 2) {
+        return {
+            success: false,
+            message: '',
+            error: 'compareReferences requires 2 arguments: <ref1> <ref2>'
+        };
+    }
 
-            const emptyUri = fileUri.with({ scheme: 'empty' });
-            const title = `${item.label} (New ↔ Working Tree)`;
+    const [ref1, ref2] = args;
 
-            outputChannel.appendLine(`  Left: ${emptyUri.toString()}`);
-            outputChannel.appendLine(`  Right: ${fileUri.toString()}`);
-
-            await vscode.commands.executeCommand('vscode.diff', emptyUri, fileUri, title);
-            outputChannel.appendLine('SUCCESS');
-            return;
-        }
-
-        // DELETED FILES: Show diff from HEAD to empty
-        if (item.status === 'Deleted') {
-            outputChannel.appendLine('Opening DELETED file diff: HEAD → empty');
-            outputChannel.appendLine(`Running: git show HEAD:"${item.relativePath}"`);
-
-            const { stdout } = await execAsync(`git show HEAD:"${item.relativePath}"`, {
-                cwd: workspaceFolders[0].uri.fsPath
-            });
-
-            outputChannel.appendLine(`Git show succeeded, bytes: ${stdout.length}`);
-
-            const ext = item.relativePath.split('.').pop()?.toLowerCase();
-            const languageMap: { [key: string]: string } = {
-                'js': 'javascript', 'ts': 'typescript', 'json': 'json',
-                'md': 'markdown', 'py': 'python', 'html': 'html',
-                'css': 'css', 'bat': 'bat', 'sh': 'shellscript'
+    try {
+        // Try multiple command invocation strategies
+        // Strategy 1: Try the compare command with refs
+        try {
+            await vscode.commands.executeCommand('gitlens.views.compareWith', ref1, ref2);
+            return {
+                success: true,
+                message: `Comparing ${ref1} with ${ref2}`
             };
-            const language = languageMap[ext || ''] || 'plaintext';
-
-            const tempDoc = await vscode.workspace.openTextDocument({
-                content: stdout,
-                language: language
-            });
-
-            const emptyUri = fileUri.with({ scheme: 'empty' });
-            const title = `${item.label} (HEAD ↔ Deleted)`;
-
-            outputChannel.appendLine(`  Left: ${tempDoc.uri.toString()}`);
-            outputChannel.appendLine(`  Right: ${emptyUri.toString()}`);
-
-            await vscode.commands.executeCommand('vscode.diff', tempDoc.uri, emptyUri, title);
-            outputChannel.appendLine('SUCCESS');
-            return;
+        } catch (e1) {
+            console.log('Strategy 1 failed, trying strategy 2', e1);
         }
 
-        // MODIFIED FILES: Check if file exists in comparison target first
-        outputChannel.appendLine(`Opening MODIFIED file diff: checking if exists in ${comparisonTarget}...`);
-
-        let fileExistsInTarget = false;
+        // Strategy 2: Try with object parameters
         try {
-            await execAsync(`git cat-file -e ${comparisonTarget}:"${item.relativePath}"`, {
-                cwd: workspaceFolders[0].uri.fsPath
-            });
-            fileExistsInTarget = true;
-            outputChannel.appendLine(`File EXISTS in ${comparisonTarget} → showing normal diff`);
-        } catch (checkError) {
-            fileExistsInTarget = false;
-            outputChannel.appendLine(`File DOES NOT EXIST in ${comparisonTarget} → treating as new file`);
+            await vscode.commands.executeCommand('gitlens.compareWith', { ref1, ref2 });
+            return {
+                success: true,
+                message: `Comparing ${ref1} with ${ref2}`
+            };
+        } catch (e2) {
+            console.log('Strategy 2 failed, trying strategy 3', e2);
         }
 
-        if (fileExistsInTarget) {
-            // File exists in comparison target - show normal diff
-            const originUri = fileUri.with({
-                scheme: 'git',
-                path: fileUri.path,
-                query: JSON.stringify({
-                    path: fileUri.fsPath,
-                    ref: comparisonTarget
-                })
-            });
-
-            const title = `${item.label} (${comparisonTarget} ↔ Working Tree)`;
-
-            outputChannel.appendLine(`  Left: ${originUri.toString()}`);
-            outputChannel.appendLine(`  Right: ${fileUri.toString()}`);
-
-            await vscode.commands.executeCommand('vscode.diff', originUri, fileUri, title);
-            outputChannel.appendLine('SUCCESS');
-        } else {
-            // File doesn't exist in comparison target - show as new file (empty → working tree)
-            const emptyUri = fileUri.with({ scheme: 'empty' });
-            const title = `${item.label} (New file ↔ Working Tree)`;
-
-            outputChannel.appendLine(`  Left: ${emptyUri.toString()}`);
-            outputChannel.appendLine(`  Right: ${fileUri.toString()}`);
-
-            await vscode.commands.executeCommand('vscode.diff', emptyUri, fileUri, title);
-            outputChannel.appendLine('SUCCESS (shown as new file)');
-        }
-    });
-
-    vscode.commands.registerCommand('gitDiffExplorer.changeComparisonTarget', async () => {
-        outputChannel.appendLine('Change comparison target command triggered');
-
-        const workspaceFolders = vscode.workspace.workspaceFolders;
-        if (!workspaceFolders) {
-            vscode.window.showErrorMessage('No workspace folder open');
-            return;
-        }
-
-        const workspaceRoot = workspaceFolders[0].uri.fsPath;
-
-        interface RefPickItem extends vscode.QuickPickItem {
-            ref: string;
-            type: 'working-tree' | 'head' | 'local' | 'remote' | 'tag' | 'worktree-head';
-            worktreePath?: string;
-        }
-
-        // STAGE 1: Choose SOURCE
-        outputChannel.appendLine('STAGE 1: Choose source');
-
-        const sourceItems: RefPickItem[] = [];
-
-        // Add Working Tree option
-        sourceItems.push({
-            label: '$(file-directory) Working Tree',
-            description: 'Current uncommitted changes',
-            ref: 'WORKING_TREE',
-            type: 'working-tree'
-        });
-
-        // Add HEAD option
-        sourceItems.push({
-            label: '$(git-commit) HEAD',
-            description: 'Current commit',
-            ref: 'HEAD',
-            type: 'head'
-        });
-
-        // Get all worktrees and add their HEADs
+        // Strategy 3: Try compareReferences command
         try {
-            const worktrees = await gitOps.getWorktrees(workspaceRoot);
-            for (const wt of worktrees) {
-                if (!wt.isMain) {
-                    const wtName = wt.path.split(/[/\\]/).pop() || 'worktree';
-                    sourceItems.push({
-                        label: `$(git-branch) ${wtName} HEAD`,
-                        description: `Worktree: ${wt.branch}`,
-                        ref: 'HEAD',
-                        type: 'worktree-head',
-                        worktreePath: wt.path
-                    });
-                }
-            }
-        } catch (error) {
-            outputChannel.appendLine(`Could not load worktrees: ${error}`);
+            await vscode.commands.executeCommand('gitlens.compareReferences', ref1, ref2);
+            return {
+                success: true,
+                message: `Comparing ${ref1} with ${ref2}`
+            };
+        } catch (e3) {
+            console.log('Strategy 3 failed, trying strategy 4', e3);
         }
 
-        const source = await vscode.window.showQuickPick(sourceItems, {
-            placeHolder: 'Select source (what to compare FROM)',
-            title: 'Step 1/2: Choose Source'
-        });
+        // Strategy 4: Try without parameters (opens picker with defaults)
+        await vscode.commands.executeCommand('gitlens.compareWith');
 
-        if (!source) {
-            return; // User cancelled
+        return {
+            success: true,
+            message: `Opened GitLens compare (use UI to select ${ref1} and ${ref2})`
+        };
+
+    } catch (error) {
+        return {
+            success: false,
+            message: '',
+            error: `Failed to execute GitLens compare: ${error instanceof Error ? error.message : String(error)}`
+        };
+    }
+}
+
+async function executeCompareHead(args: string[]): Promise<CliResult> {
+    if (args.length < 1) {
+        return {
+            success: false,
+            message: '',
+            error: 'compareHead requires 1 argument: <ref>'
+        };
+    }
+
+    const [ref] = args;
+
+    try {
+        // Try multiple command invocation strategies
+        // Strategy 1: Try with ref as parameter
+        try {
+            await vscode.commands.executeCommand('gitlens.compareHeadWith', ref);
+            return {
+                success: true,
+                message: `Comparing HEAD with ${ref}`
+            };
+        } catch (e1) {
+            console.log('Strategy 1 failed, trying strategy 2', e1);
         }
 
-        outputChannel.appendLine(`Selected source: ${source.label}`);
-
-        // STAGE 2: Choose TARGET
-        outputChannel.appendLine('STAGE 2: Choose target');
-
-        const targetItems: RefPickItem[] = [];
-
-        const branches = await gitOps.getAllBranches(workspaceRoot);
-
-        branches.remote.forEach(branch => {
-            targetItems.push({
-                label: `$(cloud) ${branch}`,
-                description: 'remote branch',
-                ref: branch,
-                type: 'remote'
-            });
-        });
-
-        branches.local.forEach(branch => {
-            targetItems.push({
-                label: `$(git-branch) ${branch}`,
-                description: 'local branch',
-                ref: branch,
-                type: 'local'
-            });
-        });
-
-        const tags = await gitOps.getAllTags(workspaceRoot);
-        tags.forEach(tag => {
-            targetItems.push({
-                label: `$(tag) ${tag}`,
-                description: 'tag',
-                ref: tag,
-                type: 'tag'
-            });
-        });
-
-        const target = await vscode.window.showQuickPick(targetItems, {
-            placeHolder: 'Select target (what to compare TO)',
-            title: 'Step 2/2: Choose Target'
-        });
-
-        if (!target) {
-            return; // User cancelled
+        // Strategy 2: Try with object parameter
+        try {
+            await vscode.commands.executeCommand('gitlens.compareHeadWith', { ref });
+            return {
+                success: true,
+                message: `Comparing HEAD with ${ref}`
+            };
+        } catch (e2) {
+            console.log('Strategy 2 failed, trying strategy 3', e2);
         }
 
-        outputChannel.appendLine(`Selected target: ${target.label}`);
+        // Strategy 3: Try views command
+        try {
+            await vscode.commands.executeCommand('gitlens.views.compareHeadWith', ref);
+            return {
+                success: true,
+                message: `Comparing HEAD with ${ref}`
+            };
+        } catch (e3) {
+            console.log('Strategy 3 failed, trying strategy 4', e3);
+        }
 
-        // Set comparison target (always the target for now, source is assumed to be HEAD/working tree)
-        gitDiffProvider.setComparisonTarget(target.ref);
-        gitDiffProvider.refresh();
+        // Strategy 4: Try without parameters (opens picker)
+        await vscode.commands.executeCommand('gitlens.compareHeadWith');
 
-        const message = `Now comparing: ${source.label} → ${target.label}`;
-        outputChannel.appendLine(message);
-        vscode.window.showInformationMessage(message);
-    });
+        return {
+            success: true,
+            message: `Opened GitLens compare HEAD (use UI to select ${ref})`
+        };
 
-    outputChannel.appendLine('All commands registered');
+    } catch (error) {
+        return {
+            success: false,
+            message: '',
+            error: `Failed to execute GitLens compare: ${error instanceof Error ? error.message : String(error)}`
+        };
+    }
 }
 
 export function deactivate() {
-    // Extension cleanup on deactivation
-    if (autoRefreshTimer) {
-        clearInterval(autoRefreshTimer);
-        autoRefreshTimer = undefined;
-        outputChannel.appendLine('Auto-refresh timer stopped');
-    }
+    console.log('GitLens CLI Bridge is now deactivated');
 }
