@@ -31,7 +31,7 @@ vscode-git-diff-extension/
 ### Initial Setup
 
 ```bash
-cd /root/album-maker/vscode-git-diff-extension
+cd /root/vscode-git-diff-extension
 npm install
 ```
 
