@@ -53,28 +53,30 @@ async function playSound(): Promise<void> {
         vscode.window.showInformationMessage('🔔 Ping!');
         log('✓ Notification shown');
 
-        // Trigger terminal bell for audio cue
+        // Trigger terminal bell by executing a command that outputs bell character
         // This works with VS Code's "Accessibility › Signals: Terminal Bell" setting
         const terminals = vscode.window.terminals;
 
         if (terminals.length > 0) {
-            // Use the active terminal if available
+            // Use the active terminal
             const terminal = vscode.window.activeTerminal || terminals[0];
-            terminal.sendText('\x07', false); // Send bell character without executing
-            log('✓ Terminal bell sent to active terminal');
+            // Execute printf to output bell character (works in bash/zsh)
+            // Using printf instead of echo for better compatibility
+            terminal.sendText('printf "\\a"');
+            log('✓ Terminal bell command executed in active terminal');
         } else {
             // Create a hidden terminal just for the bell
             const terminal = vscode.window.createTerminal({
                 name: 'ping-bell',
                 hideFromUser: true
             });
-            terminal.sendText('\x07', false);
-            log('✓ Terminal bell sent to hidden terminal');
+            terminal.sendText('printf "\\a"');
+            log('✓ Terminal bell command executed in hidden terminal');
 
             // Clean up after a short delay
             setTimeout(() => {
                 terminal.dispose();
-            }, 100);
+            }, 500);
         }
 
         return;
