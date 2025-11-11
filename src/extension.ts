@@ -6,7 +6,7 @@ const CLI_COMMAND_FILE = '.claude-helper';
 const CLI_RESULT_FILE = '.claude-helper-result';
 
 interface CliCommand {
-    command: 'compareReferences' | 'compareHead' | 'clearComparisons' | 'ping' | 'setTerminalTitle';
+    command: 'compareReferences' | 'compareHead' | 'clearComparisons' | 'ping' | 'pingTerminalTitle' | 'setTerminalTitle';
     args: string[];
     timestamp: number;
 }
@@ -126,6 +126,9 @@ async function processCliCommand(commandFilePath: string, resultFilePath: string
                 break;
             case 'ping':
                 result = await executePing(command.args);
+                break;
+            case 'pingTerminalTitle':
+                result = await executePingTerminalTitle(command.args);
                 break;
             case 'setTerminalTitle':
                 result = await executeSetTerminalTitle(command.args);
@@ -366,6 +369,48 @@ async function executePing(args: string[]): Promise<CliResult> {
             success: false,
             message: '',
             error: `Failed to execute ping: ${error instanceof Error ? error.message : String(error)}`
+        };
+    }
+}
+
+async function executePingTerminalTitle(args: string[]): Promise<CliResult> {
+    try {
+        log('Ping terminal title command received');
+
+        // Get active terminal
+        const terminal = vscode.window.activeTerminal;
+
+        if (!terminal) {
+            return {
+                success: false,
+                message: '',
+                error: 'No active terminal found'
+            };
+        }
+
+        // Get terminal title
+        const terminalTitle = terminal.name;
+        log(`Terminal title: ${terminalTitle}`);
+
+        // Get timestamp from args if provided, or use current time
+        const timestamp = args.length > 0 ? args[0] : new Date().toLocaleString();
+
+        // Build notification message
+        const notificationMsg = `🔔 Ping! [${timestamp}] Terminal: ${terminalTitle}`;
+
+        // Show notification
+        vscode.window.showInformationMessage(notificationMsg);
+        log(`✓ Notification shown: ${notificationMsg}`);
+
+        return {
+            success: true,
+            message: `Ping! Notification shown with terminal title: ${notificationMsg}`
+        };
+    } catch (error) {
+        return {
+            success: false,
+            message: '',
+            error: `Failed to execute ping terminal title: ${error instanceof Error ? error.message : String(error)}`
         };
     }
 }

@@ -229,6 +229,8 @@ ch compare main HEAD
 ch compare-head origin/main
 ch clear
 ch ping "Test notification"
+ch set-title "Dev Testing"
+ch ping-terminal-title
 ch --help
 ```
 

@@ -61,6 +61,9 @@ ch ping
 # Show notification with custom message
 ch ping "Build completed successfully"
 ch ping "Tests passed - 127 tests ran in 2.3s"
+
+# Show notification with current terminal title
+ch ping-terminal-title
 ```
 
 ### Clear Comparisons
@@ -78,6 +81,7 @@ ch clear
 | `claude-helper compare-head <ref>` | `ch compare-head` | Compare HEAD with a reference |
 | `claude-helper clear` | `ch clear` | Clear all comparisons |
 | `claude-helper ping [message]` | `ch ping` | Show notification with timestamp and optional message |
+| `claude-helper ping-terminal-title` | `ch ping-terminal-title` | Show notification with current terminal title |
 | `claude-helper set-title <title>` | `ch set-title` | Set current terminal title |
 
 ## Use Cases for Claude Code

@@ -118,11 +118,13 @@ Usage:
   claude-helper compare-head <ref>      Compare HEAD with a reference
   claude-helper clear                   Clear all comparisons
   claude-helper ping [message]          Show notification in VS Code with timestamp
+  claude-helper ping-terminal-title     Show notification with current terminal title
   claude-helper set-title <title>       Set the current terminal title
   ch compare <ref1> <ref2>              (short alias)
   ch compare-head <ref>                 (short alias)
   ch clear                              (short alias)
   ch ping [message]                     (short alias)
+  ch ping-terminal-title                (short alias)
   ch set-title <title>                  (short alias)
 
 Examples:
@@ -132,6 +134,7 @@ Examples:
   claude-helper clear
   claude-helper ping
   claude-helper ping "Build completed successfully"
+  claude-helper ping-terminal-title
   claude-helper set-title "Building Project"
 
   # Using short alias
@@ -139,6 +142,7 @@ Examples:
   ch clear
   ch ping
   ch ping "Tests finished"
+  ch ping-terminal-title
   ch set-title "Running Tests"
 
 Requirements:
@@ -199,6 +203,12 @@ def main():
         current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         ping_args = [current_time] + args.args
         return execute_command(workspace_root, "ping", ping_args)
+
+    elif args.command == "ping-terminal-title":
+        # Add current timestamp as argument
+        from datetime import datetime
+        current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        return execute_command(workspace_root, "pingTerminalTitle", [current_time])
 
     elif args.command == "set-title":
         if len(args.args) < 1:

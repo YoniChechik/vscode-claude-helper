@@ -72,8 +72,13 @@ ch ping
 # Test with custom message
 ch ping "Debug test message"
 
+# Test with terminal title
+ch set-title "Debug Session"
+ch ping-terminal-title
+
 # Should show:
 # ✓ Ping! Notification shown in VS Code: 🔔 Ping! [2025-11-11 15:56:31] Debug test message
+# ✓ Ping! Notification shown with terminal title: 🔔 Ping! [2025-11-11 16:06:31] Terminal: Debug Session
 ```
 
 ## Common Issues
