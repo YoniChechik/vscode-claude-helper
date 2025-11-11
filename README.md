@@ -14,16 +14,24 @@ Or install from the [VS Code Marketplace](https://marketplace.visualstudio.com/i
 
 ### 2. Install CLI Tool
 
-Using `uv` (recommended):
+**From PyPI** (recommended):
 
 ```bash
+# Using uv
 uv tool install claude-helper
+
+# Using pip
+pip install claude-helper
 ```
 
-Using `pip`:
+**From GitHub** (latest development version):
 
 ```bash
-pip install claude-helper
+# Using uv
+uv tool install git+https://github.com/YoniChechik/vscode-claude-helper.git
+
+# Using pip
+pip install git+https://github.com/YoniChechik/vscode-claude-helper.git
 ```
 
 ## Requirements

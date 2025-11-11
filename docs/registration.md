@@ -142,6 +142,11 @@ uv publish
    pip install claude-helper
    ```
 
+**Note:** If you haven't published to PyPI yet, users can install directly from GitHub:
+```bash
+uv tool install git+https://github.com/YoniChechik/vscode-claude-helper.git
+```
+
 ## Post-Publication
 
 ### Update Documentation
