@@ -48,19 +48,34 @@ function log(message: string) {
 async function playSound(): Promise<void> {
     log('Attempting to play sound...');
 
-    const platform = process.platform;
-    log(`Platform detected: ${platform}`);
-
     try {
-        // Use VS Code's built-in error/warning to trigger audio cues
-        // This respects user's VS Code audio settings and works in remote scenarios
-        log('Triggering VS Code audio cue via information message');
+        // Show notification
+        vscode.window.showInformationMessage('🔔 Ping!');
+        log('✓ Notification shown');
 
-        // Show and hide a message quickly to trigger the notification sound
-        const message = vscode.window.showInformationMessage('🔔 Ping!');
+        // Trigger terminal bell for audio cue
+        // This works with VS Code's "Accessibility › Signals: Terminal Bell" setting
+        const terminals = vscode.window.terminals;
 
-        // The notification itself triggers a sound if user has audio cues enabled
-        log('✓ Audio cue triggered via VS Code notification system');
+        if (terminals.length > 0) {
+            // Use the active terminal if available
+            const terminal = vscode.window.activeTerminal || terminals[0];
+            terminal.sendText('\x07', false); // Send bell character without executing
+            log('✓ Terminal bell sent to active terminal');
+        } else {
+            // Create a hidden terminal just for the bell
+            const terminal = vscode.window.createTerminal({
+                name: 'ping-bell',
+                hideFromUser: true
+            });
+            terminal.sendText('\x07', false);
+            log('✓ Terminal bell sent to hidden terminal');
+
+            // Clean up after a short delay
+            setTimeout(() => {
+                terminal.dispose();
+            }, 100);
+        }
 
         return;
     } catch (error) {
