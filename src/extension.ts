@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
-import { exec } from 'child_process';
+const soundPlay = require('sound-play');
 
 const CLI_COMMAND_FILE = '.gitlens-cli';
 const CLI_RESULT_FILE = '.gitlens-cli-result';
@@ -46,46 +46,43 @@ function log(message: string) {
     }
 }
 
-function playSound(): Promise<void> {
-    return new Promise((resolve) => {
-        log('Attempting to play sound...');
+async function playSound(): Promise<void> {
+    log('Attempting to play sound...');
 
-        // Determine platform-specific sound command
-        const platform = process.platform;
-        let command: string;
+    const platform = process.platform;
+    log(`Platform detected: ${platform}`);
+
+    try {
+        let soundPath: string;
 
         if (platform === 'darwin') {
-            // macOS - use afplay with system sound
-            command = 'afplay /System/Library/Sounds/Ping.aiff';
-        } else if (platform === 'linux') {
-            // Linux - try multiple options
-            // Try paplay (PulseAudio), then aplay (ALSA), then beep
-            command = 'paplay /usr/share/sounds/freedesktop/stereo/bell.oga 2>/dev/null || aplay /usr/share/sounds/alsa/Front_Center.wav 2>/dev/null || printf "\\a"';
+            // macOS - use system sound
+            soundPath = '/System/Library/Sounds/Ping.aiff';
         } else if (platform === 'win32') {
-            // Windows - use PowerShell beep
-            command = 'powershell -c "[console]::beep(800,200)"';
+            // Windows - use system sound
+            soundPath = 'C:\\Windows\\Media\\Windows Ding.wav';
         } else {
-            // Fallback - try terminal bell
-            command = 'printf "\\a"';
+            // Linux - use freedesktop sound
+            soundPath = '/usr/share/sounds/freedesktop/stereo/bell.oga';
         }
 
-        log(`Executing sound command for platform ${platform}: ${command}`);
+        log(`Attempting to play sound file: ${soundPath}`);
 
-        exec(command, (error, stdout, stderr) => {
-            if (error) {
-                log(`Sound command error: ${error.message}`);
-                console.error('Error playing sound:', error);
-            } else {
-                log('✓ Sound played successfully');
-            }
+        // Try to play using sound-play package
+        await soundPlay.play(soundPath);
+        log('✓ Sound played successfully');
+    } catch (error) {
+        log(`Sound playback error: ${error instanceof Error ? error.message : String(error)}`);
+        log('Falling back to console beep...');
 
-            if (stderr) {
-                log(`Sound command stderr: ${stderr}`);
-            }
-
-            resolve();
-        });
-    });
+        // Fallback: try to output terminal bell character
+        try {
+            process.stdout.write('\x07');
+            log('✓ Terminal bell sent');
+        } catch (fallbackError) {
+            log(`Fallback also failed: ${fallbackError instanceof Error ? fallbackError.message : String(fallbackError)}`);
+        }
+    }
 }
 
 export function activate(context: vscode.ExtensionContext) {
