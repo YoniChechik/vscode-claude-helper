@@ -59,12 +59,17 @@ Best for rapid iteration:
 ### Using uv (Recommended)
 
 ```bash
-# Reinstall from local source
+# Quick reinstall (may use cached version)
 uv tool install --force .
+
+# Full reinstall (clears cache - use if changes not applying)
+uv cache clean && uv tool uninstall gitlens-cli-bridge && uv tool install .
 
 # Or reinstall from PyPI (when published)
 uv tool upgrade gitlens-cli-bridge
 ```
+
+**Note:** If you modify `cli.py` and reinstall but still see old behavior, UV may be using a cached build. Use the "Full reinstall" command above to clear the cache.
 
 ### Using pip (Alternative)
 
