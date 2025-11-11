@@ -10,12 +10,12 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/YoniChechik/vscode-git-diff-extension"
+    "url": "https://github.com/YoniChechik/vscode-claude-helper"
   },
   "bugs": {
-    "url": "https://github.com/YoniChechik/vscode-git-diff-extension/issues"
+    "url": "https://github.com/YoniChechik/vscode-claude-helper/issues"
   },
-  "homepage": "https://github.com/YoniChechik/vscode-git-diff-extension#readme",
+  "homepage": "https://github.com/YoniChechik/vscode-claude-helper#readme",
   "keywords": [
     "claude",
     "cli",

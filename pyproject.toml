@@ -27,9 +27,9 @@ classifiers = [
 dependencies = []
 
 [project.urls]
-Homepage = "https://github.com/YoniChechik/vscode-git-diff-extension"
-Repository = "https://github.com/YoniChechik/vscode-git-diff-extension"
-Issues = "https://github.com/YoniChechik/vscode-git-diff-extension/issues"
+Homepage = "https://github.com/YoniChechik/vscode-claude-helper"
+Repository = "https://github.com/YoniChechik/vscode-claude-helper"
+Issues = "https://github.com/YoniChechik/vscode-claude-helper/issues"
 
 [project.scripts]
 claude-helper = "claude_helper.cli:cli_main"

@@ -21,7 +21,7 @@ ENV UV_LINK_MODE=copy
 ENV UV_PROJECT_ENVIRONMENT=/venv \
     PATH=/venv/bin:$PATH
 
-WORKDIR /root/vscode-git-diff-extension 
+WORKDIR /root/vscode-claude-helper 
 
 RUN --mount=target=/var/lib/apt/lists,type=cache,sharing=locked \
     --mount=target=/var/cache/apt,type=cache,sharing=locked \
@@ -64,7 +64,7 @@ RUN --mount=target=/var/lib/apt/lists,type=cache,sharing=locked \
     npm install -g @anthropic-ai/claude-code
 
 # ==== uv
-RUN --mount=type=bind,source=.,target=/root/vscode-git-diff-extension,rw \
+RUN --mount=type=bind,source=.,target=/root/vscode-claude-helper,rw \
     --mount=type=cache,target=/root/.cache/uv \
     UV_COMPILE_BYTECODE=1  \
     uv venv --seed \
@@ -84,12 +84,12 @@ RUN (type -p wget >/dev/null || (apt-get update && apt-get install wget -y)) \
 
 # ==== git safe directories
 # Mark repo directory as safe to avoid git ownership warnings
-RUN git config --global --add safe.directory /root/vscode-git-diff-extension
+RUN git config --global --add safe.directory /root/vscode-claude-helper
 
 # ========== prod image
 FROM base AS production
 
-RUN --mount=type=bind,source=.,target=/root/vscode-git-diff-extension,rw \
+RUN --mount=type=bind,source=.,target=/root/vscode-claude-helper,rw \
     --mount=type=cache,target=/root/.cache/uv \
     UV_COMPILE_BYTECODE=1  \
     uv venv --seed \
