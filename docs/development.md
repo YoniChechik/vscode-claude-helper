@@ -228,6 +228,7 @@ uv tool install --force .
 ch compare main HEAD
 ch compare-head origin/main
 ch clear
+ch ping "Test notification"
 ch --help
 ```
 

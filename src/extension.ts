@@ -125,7 +125,7 @@ async function processCliCommand(commandFilePath: string, resultFilePath: string
                 result = await executeClearComparisons();
                 break;
             case 'ping':
-                result = await executePing();
+                result = await executePing(command.args);
                 break;
             case 'setTerminalTitle':
                 result = await executeSetTerminalTitle(command.args);
@@ -336,17 +336,30 @@ async function executeClearComparisons(): Promise<CliResult> {
     }
 }
 
-async function executePing(): Promise<CliResult> {
+async function executePing(args: string[]): Promise<CliResult> {
     try {
         log('Ping command received');
 
+        // args[0] is timestamp, rest is custom message
+        const timestamp = args.length > 0 ? args[0] : '';
+        const customMessage = args.length > 1 ? args.slice(1).join(' ') : '';
+
+        // Build notification message
+        let notificationMsg = '🔔 Ping!';
+        if (timestamp) {
+            notificationMsg += ` [${timestamp}]`;
+        }
+        if (customMessage) {
+            notificationMsg += ` ${customMessage}`;
+        }
+
         // Show notification
-        vscode.window.showInformationMessage('🔔 Ping!');
-        log('✓ Notification shown');
+        vscode.window.showInformationMessage(notificationMsg);
+        log(`✓ Notification shown: ${notificationMsg}`);
 
         return {
             success: true,
-            message: 'Ping! Notification shown in VS Code'
+            message: `Ping! Notification shown in VS Code: ${notificationMsg}`
         };
     } catch (error) {
         return {

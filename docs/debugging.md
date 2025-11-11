@@ -43,10 +43,13 @@ The CLI tool writes debug information to `.claude-helper-result`:
 
 ```bash
 # Run command
-ch ping
+ch ping "Test message"
 
 # Check result
 cat .claude-helper-result
+
+# Or check debug file
+cat .claude-helper-debug.json
 ```
 
 ### Check CLI Installation
@@ -63,11 +66,14 @@ ch --help
 ### Test CLI Communication
 
 ```bash
-# Simple test
+# Simple test with timestamp
 ch ping
 
+# Test with custom message
+ch ping "Debug test message"
+
 # Should show:
-# ✓ Ping! Notification shown in VS Code
+# ✓ Ping! Notification shown in VS Code: 🔔 Ping! [2025-11-11 15:56:31] Debug test message
 ```
 
 ## Common Issues

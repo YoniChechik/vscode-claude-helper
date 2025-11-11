@@ -80,14 +80,14 @@ def execute_command(workspace_root: Path, command: str, args: list[str]) -> int:
         print(f"✗ Error: {e}", file=sys.stderr)
         print("\nMake sure:", file=sys.stderr)
         print("  - VS Code is open with your workspace", file=sys.stderr)
-        print("  - GitLens CLI Bridge extension is installed and activated", file=sys.stderr)
-        print("  - GitLens extension is installed", file=sys.stderr)
+        print("  - Claude Helper extension is installed and activated", file=sys.stderr)
+        print("  - GitLens extension is installed (for compare commands)", file=sys.stderr)
         return 1
 
     # Debug: Write result to file for inspection
     import json as json_module
 
-    debug_path = workspace_root / ".gitlens-cli-debug.json"
+    debug_path = workspace_root / ".claude-helper-debug.json"
     debug_path.write_text(json_module.dumps(result, indent=2))
     print(f"[Debug: Result written to {debug_path}]")
 
@@ -117,12 +117,12 @@ Usage:
   claude-helper compare <ref1> <ref2>   Compare two git references
   claude-helper compare-head <ref>      Compare HEAD with a reference
   claude-helper clear                   Clear all comparisons
-  claude-helper ping                    Show notification in VS Code
+  claude-helper ping [message]          Show notification in VS Code with timestamp
   claude-helper set-title <title>       Set the current terminal title
   ch compare <ref1> <ref2>              (short alias)
   ch compare-head <ref>                 (short alias)
   ch clear                              (short alias)
-  ch ping                               (short alias)
+  ch ping [message]                     (short alias)
   ch set-title <title>                  (short alias)
 
 Examples:
@@ -131,12 +131,14 @@ Examples:
   claude-helper compare-head origin/main
   claude-helper clear
   claude-helper ping
+  claude-helper ping "Build completed successfully"
   claude-helper set-title "Building Project"
 
   # Using short alias
   ch compare main feature-branch
   ch clear
   ch ping
+  ch ping "Tests finished"
   ch set-title "Running Tests"
 
 Requirements:
@@ -192,7 +194,11 @@ def main():
         return execute_command(workspace_root, "clearComparisons", [])
 
     elif args.command == "ping":
-        return execute_command(workspace_root, "ping", [])
+        # Add current timestamp as first argument, then any custom message
+        from datetime import datetime
+        current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        ping_args = [current_time] + args.args
+        return execute_command(workspace_root, "ping", ping_args)
 
     elif args.command == "set-title":
         if len(args.args) < 1:

@@ -55,8 +55,12 @@ ch set-title "Running Tests"
 ### Notifications
 
 ```bash
-# Show a notification in VS Code
+# Show a notification in VS Code with timestamp
 ch ping
+
+# Show notification with custom message
+ch ping "Build completed successfully"
+ch ping "Tests passed - 127 tests ran in 2.3s"
 ```
 
 ### Clear Comparisons
@@ -73,7 +77,7 @@ ch clear
 | `claude-helper compare <ref1> <ref2>` | `ch compare` | Compare two git references |
 | `claude-helper compare-head <ref>` | `ch compare-head` | Compare HEAD with a reference |
 | `claude-helper clear` | `ch clear` | Clear all comparisons |
-| `claude-helper ping` | `ch ping` | Show notification in VS Code |
+| `claude-helper ping [message]` | `ch ping` | Show notification with timestamp and optional message |
 | `claude-helper set-title <title>` | `ch set-title` | Set current terminal title |
 
 ## Use Cases for Claude Code
