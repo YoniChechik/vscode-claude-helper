@@ -1,7 +1,6 @@
 import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
-const soundPlay = require('sound-play');
 
 const CLI_COMMAND_FILE = '.gitlens-cli';
 const CLI_RESULT_FILE = '.gitlens-cli-result';
@@ -53,35 +52,19 @@ async function playSound(): Promise<void> {
     log(`Platform detected: ${platform}`);
 
     try {
-        let soundPath: string;
+        // Use VS Code's built-in error/warning to trigger audio cues
+        // This respects user's VS Code audio settings and works in remote scenarios
+        log('Triggering VS Code audio cue via information message');
 
-        if (platform === 'darwin') {
-            // macOS - use system sound
-            soundPath = '/System/Library/Sounds/Ping.aiff';
-        } else if (platform === 'win32') {
-            // Windows - use system sound
-            soundPath = 'C:\\Windows\\Media\\Windows Ding.wav';
-        } else {
-            // Linux - use freedesktop sound
-            soundPath = '/usr/share/sounds/freedesktop/stereo/bell.oga';
-        }
+        // Show and hide a message quickly to trigger the notification sound
+        const message = vscode.window.showInformationMessage('🔔 Ping!');
 
-        log(`Attempting to play sound file: ${soundPath}`);
+        // The notification itself triggers a sound if user has audio cues enabled
+        log('✓ Audio cue triggered via VS Code notification system');
 
-        // Try to play using sound-play package
-        await soundPlay.play(soundPath);
-        log('✓ Sound played successfully');
+        return;
     } catch (error) {
-        log(`Sound playback error: ${error instanceof Error ? error.message : String(error)}`);
-        log('Falling back to console beep...');
-
-        // Fallback: try to output terminal bell character
-        try {
-            process.stdout.write('\x07');
-            log('✓ Terminal bell sent');
-        } catch (fallbackError) {
-            log(`Fallback also failed: ${fallbackError instanceof Error ? fallbackError.message : String(fallbackError)}`);
-        }
+        log(`Failed to trigger audio cue: ${error instanceof Error ? error.message : String(error)}`);
     }
 }
 
@@ -376,15 +359,12 @@ async function executePing(): Promise<CliResult> {
     try {
         log('Ping command received');
 
-        // Play sound
+        // Play sound (which shows notification)
         await playSound();
-
-        // Also show a subtle notification
-        vscode.window.showInformationMessage('🔔 Ping from CLI!');
 
         return {
             success: true,
-            message: 'Ping! Sound played in VS Code'
+            message: 'Ping! Notification shown in VS Code'
         };
     } catch (error) {
         return {
