@@ -1,12 +1,13 @@
 import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
+import { exec } from 'child_process';
 
 const CLI_COMMAND_FILE = '.gitlens-cli';
 const CLI_RESULT_FILE = '.gitlens-cli-result';
 
 interface CliCommand {
-    command: 'compareReferences' | 'compareHead' | 'clearComparisons';
+    command: 'compareReferences' | 'compareHead' | 'clearComparisons' | 'ping';
     args: string[];
     timestamp: number;
 }
@@ -43,6 +44,48 @@ function log(message: string) {
     if (logMessages.length > 100) {
         logMessages.shift();
     }
+}
+
+function playSound(): Promise<void> {
+    return new Promise((resolve) => {
+        log('Attempting to play sound...');
+
+        // Determine platform-specific sound command
+        const platform = process.platform;
+        let command: string;
+
+        if (platform === 'darwin') {
+            // macOS - use afplay with system sound
+            command = 'afplay /System/Library/Sounds/Ping.aiff';
+        } else if (platform === 'linux') {
+            // Linux - try multiple options
+            // Try paplay (PulseAudio), then aplay (ALSA), then beep
+            command = 'paplay /usr/share/sounds/freedesktop/stereo/bell.oga 2>/dev/null || aplay /usr/share/sounds/alsa/Front_Center.wav 2>/dev/null || printf "\\a"';
+        } else if (platform === 'win32') {
+            // Windows - use PowerShell beep
+            command = 'powershell -c "[console]::beep(800,200)"';
+        } else {
+            // Fallback - try terminal bell
+            command = 'printf "\\a"';
+        }
+
+        log(`Executing sound command for platform ${platform}: ${command}`);
+
+        exec(command, (error, stdout, stderr) => {
+            if (error) {
+                log(`Sound command error: ${error.message}`);
+                console.error('Error playing sound:', error);
+            } else {
+                log('✓ Sound played successfully');
+            }
+
+            if (stderr) {
+                log(`Sound command stderr: ${stderr}`);
+            }
+
+            resolve();
+        });
+    });
 }
 
 export function activate(context: vscode.ExtensionContext) {
@@ -122,6 +165,9 @@ async function processCliCommand(commandFilePath: string, resultFilePath: string
                 break;
             case 'clearComparisons':
                 result = await executeClearComparisons();
+                break;
+            case 'ping':
+                result = await executePing();
                 break;
             default:
                 result = {
@@ -325,6 +371,29 @@ async function executeClearComparisons(): Promise<CliResult> {
             success: false,
             message: '',
             error: `Failed to clear comparisons: ${error instanceof Error ? error.message : String(error)}`
+        };
+    }
+}
+
+async function executePing(): Promise<CliResult> {
+    try {
+        log('Ping command received');
+
+        // Play sound
+        await playSound();
+
+        // Also show a subtle notification
+        vscode.window.showInformationMessage('🔔 Ping from CLI!');
+
+        return {
+            success: true,
+            message: 'Ping! Sound played in VS Code'
+        };
+    } catch (error) {
+        return {
+            success: false,
+            message: '',
+            error: `Failed to execute ping: ${error instanceof Error ? error.message : String(error)}`
         };
     }
 }
