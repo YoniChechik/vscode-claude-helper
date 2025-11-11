@@ -381,11 +381,12 @@ async function executeSetTerminalTitle(args: string[]): Promise<CliResult> {
             };
         }
 
-        // Send ANSI escape sequence to set terminal title
-        // \x1b]0; sets both icon and window title
-        // \x07 is the bell character that terminates the sequence
-        terminal.sendText(`printf '\\033]0;${title}\\007'`, false);
-        log('✓ Terminal title escape sequence sent');
+        // Use VS Code's built-in command to rename terminal
+        await vscode.commands.executeCommand('workbench.action.terminal.renameWithArg', {
+            name: title
+        });
+
+        log('✓ Terminal renamed using VS Code API');
 
         return {
             success: true,
