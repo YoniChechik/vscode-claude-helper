@@ -1,7 +1,6 @@
 import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
-import { exec } from 'child_process';
 
 const CLI_COMMAND_FILE = '.gitlens-cli';
 const CLI_RESULT_FILE = '.gitlens-cli-result';
@@ -23,7 +22,6 @@ interface CliResult {
 let outputChannel: vscode.OutputChannel;
 let logMessages: string[] = [];
 let workspaceLogPath: string | undefined;
-let extensionContext: vscode.ExtensionContext;
 
 function log(message: string) {
     const timestamp = new Date().toLocaleTimeString();
@@ -47,95 +45,8 @@ function log(message: string) {
     }
 }
 
-async function playSound(): Promise<void> {
-    log('Attempting to play sound via WebView...');
-
-    try {
-        // Show notification
-        vscode.window.showInformationMessage('🔔 Ping!');
-        log('✓ Notification shown');
-
-        // Create a WebView to play sound using HTML5 audio element
-        // This runs in the VS Code UI process (Windows host), not in container
-        const panel = vscode.window.createWebviewPanel(
-            'pingSound',
-            'Ping',
-            { viewColumn: vscode.ViewColumn.Active, preserveFocus: true },
-            {
-                enableScripts: true,
-                localResourceRoots: [
-                    vscode.Uri.file(path.join(extensionContext.extensionPath, 'media'))
-                ]
-            }
-        );
-
-        // Get proper URI for the beep sound file
-        const beepPath = vscode.Uri.file(path.join(extensionContext.extensionPath, 'media', 'beep.wav'));
-        const beepUri = panel.webview.asWebviewUri(beepPath);
-
-        log(`Beep file URI: ${beepUri.toString()}`);
-
-        panel.webview.html = `<!DOCTYPE html>
-<html>
-<head>
-    <meta charset="UTF-8">
-    <title>Ping</title>
-    <style>
-        body {
-            margin: 0;
-            padding: 20px;
-            font-family: var(--vscode-font-family);
-            color: var(--vscode-foreground);
-            background: var(--vscode-editor-background);
-        }
-    </style>
-</head>
-<body>
-    <h3>🔔 Ping!</h3>
-    <p>Playing sound...</p>
-    <audio id="beep" autoplay>
-        <source src="${beepUri}" type="audio/wav">
-    </audio>
-    <script>
-        (function() {
-            const audio = document.getElementById('beep');
-
-            // Try to play
-            audio.play().then(() => {
-                console.log('Sound played successfully');
-            }).catch(err => {
-                console.error('Failed to autoplay sound:', err);
-                alert('Click to play sound (autoplay blocked)');
-                document.body.addEventListener('click', () => {
-                    audio.play();
-                }, { once: true });
-            });
-
-            // Auto-close after sound finishes
-            audio.addEventListener('ended', () => {
-                setTimeout(() => window.close(), 200);
-            });
-        })();
-    </script>
-</body>
-</html>`;
-
-        // Auto-close after 3 seconds as fallback
-        setTimeout(() => {
-            if (panel) {
-                panel.dispose();
-            }
-        }, 3000);
-
-        log('✓ WebView sound panel created');
-        return;
-    } catch (error) {
-        log(`Failed to trigger audio via WebView: ${error instanceof Error ? error.message : String(error)}`);
-    }
-}
 
 export function activate(context: vscode.ExtensionContext) {
-    extensionContext = context;
     outputChannel = vscode.window.createOutputChannel('GitLens CLI Bridge');
     context.subscriptions.push(outputChannel);
 
@@ -426,8 +337,9 @@ async function executePing(): Promise<CliResult> {
     try {
         log('Ping command received');
 
-        // Play sound (which shows notification)
-        await playSound();
+        // Show notification
+        vscode.window.showInformationMessage('🔔 Ping!');
+        log('✓ Notification shown');
 
         return {
             success: true,
