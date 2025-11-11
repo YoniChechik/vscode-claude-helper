@@ -1,7 +1,7 @@
 {
   "name": "gitlens-cli-bridge",
   "displayName": "GitLens CLI Bridge",
-  "description": "Run GitLens compare commands from the CLI",
+  "description": "Run GitLens compare commands from the CLI (VS Code Extension - CLI tool available via: uv tool install gitlens-cli-bridge)",
   "version": "1.0.0",
   "publisher": "YoniChechik",
   "author": {
@@ -33,13 +33,17 @@
     "onStartupFinished"
   ],
   "main": "./out/extension.js",
-  "contributes": {},
+  "contributes": {
+    "commands": [
+      {
+        "command": "gitlens-cli-bridge.showLogs",
+        "title": "GitLens CLI Bridge: Show Logs"
+      }
+    ]
+  },
   "extensionDependencies": [
     "eamodio.gitlens"
   ],
-  "bin": {
-    "gitlens": "./bin/gitlens-cli.js"
-  },
   "scripts": {
     "vscode:prepublish": "npm run compile",
     "compile": "tsc -p ./",

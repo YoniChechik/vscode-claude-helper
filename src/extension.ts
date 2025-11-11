@@ -6,7 +6,7 @@ const CLI_COMMAND_FILE = '.gitlens-cli';
 const CLI_RESULT_FILE = '.gitlens-cli-result';
 
 interface CliCommand {
-    command: 'compareReferences' | 'compareHead';
+    command: 'compareReferences' | 'compareHead' | 'clearComparisons';
     args: string[];
     timestamp: number;
 }
@@ -15,17 +15,61 @@ interface CliResult {
     success: boolean;
     message: string;
     error?: string;
+    logs?: string[];
+}
+
+// Create output channel for logging
+let outputChannel: vscode.OutputChannel;
+let logMessages: string[] = [];
+let workspaceLogPath: string | undefined;
+
+function log(message: string) {
+    const timestamp = new Date().toLocaleTimeString();
+    const logLine = `[${timestamp}] ${message}`;
+    outputChannel.appendLine(logLine);
+    logMessages.push(logLine);
+
+    // Write to file immediately for debugging
+    if (workspaceLogPath) {
+        try {
+            const allLogs = logMessages.join('\n') + '\n';
+            fs.writeFileSync(workspaceLogPath, allLogs);
+        } catch (e) {
+            console.error('Failed to write log file:', e);
+        }
+    }
+
+    // Keep only last 100 log messages
+    if (logMessages.length > 100) {
+        logMessages.shift();
+    }
 }
 
 export function activate(context: vscode.ExtensionContext) {
-    console.log('GitLens CLI Bridge is now active');
+    outputChannel = vscode.window.createOutputChannel('GitLens CLI Bridge');
+    context.subscriptions.push(outputChannel);
 
-    // Get workspace root
+    // Get workspace root first
     const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
     if (!workspaceRoot) {
         console.log('No workspace folder found');
         return;
     }
+
+    // Set up log file path
+    workspaceLogPath = path.join(workspaceRoot, '.gitlens-cli-extension.log');
+
+    log('GitLens CLI Bridge is now active');
+    console.log('GitLens CLI Bridge is now active');
+
+    // Show activation notification
+    vscode.window.showInformationMessage('GitLens CLI Bridge activated - logs in .gitlens-cli-extension.log');
+
+    // Register command to show logs
+    const showLogsCommand = vscode.commands.registerCommand('gitlens-cli-bridge.showLogs', () => {
+        outputChannel.show();
+    });
+    context.subscriptions.push(showLogsCommand);
 
     const commandFilePath = path.join(workspaceRoot, CLI_COMMAND_FILE);
     const resultFilePath = path.join(workspaceRoot, CLI_RESULT_FILE);
@@ -36,11 +80,13 @@ export function activate(context: vscode.ExtensionContext) {
     );
 
     watcher.onDidCreate(async () => {
+        log('CLI command file detected');
         console.log('CLI command file detected');
         await processCliCommand(commandFilePath, resultFilePath);
     });
 
     watcher.onDidChange(async () => {
+        log('CLI command file changed');
         console.log('CLI command file changed');
         await processCliCommand(commandFilePath, resultFilePath);
     });
@@ -55,10 +101,14 @@ export function activate(context: vscode.ExtensionContext) {
 
 async function processCliCommand(commandFilePath: string, resultFilePath: string) {
     try {
+        // Clear logs for this command
+        logMessages = [];
+
         // Read command file
         const commandData = fs.readFileSync(commandFilePath, 'utf8');
         const command: CliCommand = JSON.parse(commandData);
 
+        log(`Processing command: ${command.command} with args: ${JSON.stringify(command.args)}`);
         console.log('Processing command:', command);
 
         let result: CliResult;
@@ -70,6 +120,9 @@ async function processCliCommand(commandFilePath: string, resultFilePath: string
             case 'compareHead':
                 result = await executeCompareHead(command.args);
                 break;
+            case 'clearComparisons':
+                result = await executeClearComparisons();
+                break;
             default:
                 result = {
                     success: false,
@@ -78,6 +131,9 @@ async function processCliCommand(commandFilePath: string, resultFilePath: string
                 };
         }
 
+        // Add logs to result
+        result.logs = [...logMessages];
+
         // Write result
         fs.writeFileSync(resultFilePath, JSON.stringify(result, null, 2));
 
@@ -85,11 +141,13 @@ async function processCliCommand(commandFilePath: string, resultFilePath: string
         fs.unlinkSync(commandFilePath);
 
     } catch (error) {
+        log(`Error processing CLI command: ${error instanceof Error ? error.message : String(error)}`);
         console.error('Error processing CLI command:', error);
         const errorResult: CliResult = {
             success: false,
             message: '',
-            error: error instanceof Error ? error.message : String(error)
+            error: error instanceof Error ? error.message : String(error),
+            logs: [...logMessages]
         };
         fs.writeFileSync(resultFilePath, JSON.stringify(errorResult, null, 2));
 
@@ -114,46 +172,75 @@ async function executeCompareReferences(args: string[]): Promise<CliResult> {
     const [ref1, ref2] = args;
 
     try {
-        // Try multiple command invocation strategies
-        // Strategy 1: Try the compare command with refs
+        const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+        if (!workspaceFolder) {
+            return {
+                success: false,
+                message: '',
+                error: 'No workspace folder found'
+            };
+        }
+
+        // Get the Git extension API
+        const gitExtension = vscode.extensions.getExtension('vscode.git')?.exports;
+        const git = gitExtension?.getAPI(1);
+
+        if (!git || git.repositories.length === 0) {
+            return {
+                success: false,
+                message: '',
+                error: 'No Git repository found'
+            };
+        }
+
+        const repo = git.repositories[0];
+
+        // Try to open the comparison using GitLens's showQuickCommit
+        // This opens a comparison view for the changes between two refs
         try {
-            await vscode.commands.executeCommand('gitlens.views.compareWith', ref1, ref2);
+            await vscode.commands.executeCommand('gitlens.compareWith', {
+                ref1: ref1,
+                ref2: ref2,
+                repoPath: repo.rootUri.fsPath
+            });
             return {
                 success: true,
-                message: `Comparing ${ref1} with ${ref2}`
+                message: `Opened comparison: ${ref1} ↔ ${ref2}`
             };
         } catch (e1) {
-            console.log('Strategy 1 failed, trying strategy 2', e1);
+            console.log('compareWith failed, trying openComparisonOnRemote', e1);
         }
 
-        // Strategy 2: Try with object parameters
+        // Alternative: Try the Views comparison
         try {
-            await vscode.commands.executeCommand('gitlens.compareWith', { ref1, ref2 });
+            await vscode.commands.executeCommand('gitlens.views.compare.selectForCompare');
+            await vscode.commands.executeCommand('gitlens.views.compare.compareWithSelected');
             return {
                 success: true,
-                message: `Comparing ${ref1} with ${ref2}`
+                message: `Opened GitLens comparison view for ${ref1} and ${ref2}`
             };
         } catch (e2) {
-            console.log('Strategy 2 failed, trying strategy 3', e2);
+            console.log('Views compare failed, trying diffWith', e2);
         }
 
-        // Strategy 3: Try compareReferences command
+        // Last resort: Open a simple diff view
         try {
-            await vscode.commands.executeCommand('gitlens.compareReferences', ref1, ref2);
+            const uri1 = vscode.Uri.parse(`gitlens://ref/${ref1}`);
+            const uri2 = vscode.Uri.parse(`gitlens://ref/${ref2}`);
+            await vscode.commands.executeCommand('vscode.diff', uri1, uri2, `${ref1} ↔ ${ref2}`);
             return {
                 success: true,
-                message: `Comparing ${ref1} with ${ref2}`
+                message: `Opened diff view: ${ref1} ↔ ${ref2}`
             };
         } catch (e3) {
-            console.log('Strategy 3 failed, trying strategy 4', e3);
+            console.log('Diff failed, falling back to plain compareWith', e3);
         }
 
-        // Strategy 4: Try without parameters (opens picker with defaults)
+        // Final fallback: Just open the GitLens compare view (user will need to select refs)
         await vscode.commands.executeCommand('gitlens.compareWith');
-
         return {
             success: true,
-            message: `Opened GitLens compare (use UI to select ${ref1} and ${ref2})`
+            message: `Opened GitLens compare view (please select ${ref1} and ${ref2} from the UI)`
         };
 
     } catch (error) {
@@ -176,54 +263,68 @@ async function executeCompareHead(args: string[]): Promise<CliResult> {
 
     const [ref] = args;
 
+    // Just delegate to executeCompareReferences with HEAD as first ref
+    return executeCompareReferences(['HEAD', ref]);
+}
+
+async function executeClearComparisons(): Promise<CliResult> {
     try {
-        // Try multiple command invocation strategies
-        // Strategy 1: Try with ref as parameter
-        try {
-            await vscode.commands.executeCommand('gitlens.compareHeadWith', ref);
-            return {
-                success: true,
-                message: `Comparing HEAD with ${ref}`
-            };
-        } catch (e1) {
-            console.log('Strategy 1 failed, trying strategy 2', e1);
+        // Try various GitLens commands to clear/dismiss comparisons
+        const commandsToTry = [
+            // The correct command from searchAndCompareView.ts
+            { cmd: 'gitlens.views.searchAndCompare.clear', msg: 'Cleared all comparisons from Search & Compare view' },
+            // Legacy commands (keeping as fallback)
+            { cmd: 'gitlens.views.compare.clearResults', msg: 'Cleared all comparison results' },
+            { cmd: 'gitlens.views.clearComparison', msg: 'Cleared comparison state' },
+            { cmd: 'gitlens.clearComparison', msg: 'Cleared comparisons' },
+            { cmd: 'gitlens.views.compare.clear', msg: 'Cleared compare view' },
+            { cmd: 'gitlens.closeComparison', msg: 'Closed comparisons' },
+            { cmd: 'gitlens.views.compare.dismissAll', msg: 'Dismissed all comparisons' }
+        ];
+
+        // Try each command in sequence
+        for (const { cmd, msg } of commandsToTry) {
+            try {
+                log(`Trying command: ${cmd}`);
+                await vscode.commands.executeCommand(cmd);
+                log(`✓ Successfully executed ${cmd}`);
+                console.log(`Successfully executed ${cmd}`);
+                return {
+                    success: true,
+                    message: msg
+                };
+            } catch (e) {
+                log(`✗ Command ${cmd} failed: ${e}`);
+                console.log(`Command ${cmd} failed:`, e);
+                // Continue to next command
+            }
         }
 
-        // Strategy 2: Try with object parameter
+        // If all commands fail, open the GitLens view so user can manually clear
+        log('All clear commands failed, opening GitLens view for manual clearing');
         try {
-            await vscode.commands.executeCommand('gitlens.compareHeadWith', { ref });
+            await vscode.commands.executeCommand('workbench.view.extension.gitlens');
             return {
-                success: true,
-                message: `Comparing HEAD with ${ref}`
+                success: false,
+                message: '',
+                error: 'Could not automatically clear comparisons - please use the X buttons in GitLens Compare view to dismiss them manually'
             };
-        } catch (e2) {
-            console.log('Strategy 2 failed, trying strategy 3', e2);
+        } catch (e) {
+            log(`Opening GitLens view failed: ${e}`);
+            console.log('Opening GitLens view failed', e);
         }
-
-        // Strategy 3: Try views command
-        try {
-            await vscode.commands.executeCommand('gitlens.views.compareHeadWith', ref);
-            return {
-                success: true,
-                message: `Comparing HEAD with ${ref}`
-            };
-        } catch (e3) {
-            console.log('Strategy 3 failed, trying strategy 4', e3);
-        }
-
-        // Strategy 4: Try without parameters (opens picker)
-        await vscode.commands.executeCommand('gitlens.compareHeadWith');
 
         return {
-            success: true,
-            message: `Opened GitLens compare HEAD (use UI to select ${ref})`
+            success: false,
+            message: '',
+            error: 'Could not clear comparisons - please manually dismiss them using the X buttons in GitLens Compare view'
         };
 
     } catch (error) {
         return {
             success: false,
             message: '',
-            error: `Failed to execute GitLens compare: ${error instanceof Error ? error.message : String(error)}`
+            error: `Failed to clear comparisons: ${error instanceof Error ? error.message : String(error)}`
         };
     }
 }

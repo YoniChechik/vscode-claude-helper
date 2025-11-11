@@ -1,10 +1,46 @@
 [project]
-name = "vscode-git-diff-extension"
-version = "0.1.0"
-description = "Add your description here"
+name = "gitlens-cli-bridge"
+version = "1.0.0"
+description = "Run GitLens compare commands from the CLI - bridges terminal with VS Code's GitLens extension"
 readme = "README.md"
-requires-python = ">=3.13"
+requires-python = ">=3.9"
+license = { text = "MIT" }
+authors = [
+    { name = "Yoni Chechik" }
+]
+keywords = ["gitlens", "cli", "git", "compare", "branches", "vscode", "diff"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Software Development :: Version Control :: Git",
+    "Topic :: Utilities",
+]
 dependencies = []
+
+[project.urls]
+Homepage = "https://github.com/YoniChechik/vscode-git-diff-extension"
+Repository = "https://github.com/YoniChechik/vscode-git-diff-extension"
+Issues = "https://github.com/YoniChechik/vscode-git-diff-extension/issues"
+
+[project.scripts]
+gitlens-cli = "gitlens_cli_bridge.cli:cli_main"
+glcli = "gitlens_cli_bridge.cli:cli_main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["gitlens_cli_bridge"]
 
 [tool.uv.workspace]
 members = [
