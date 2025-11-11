@@ -6,7 +6,7 @@ const CLI_COMMAND_FILE = '.gitlens-cli';
 const CLI_RESULT_FILE = '.gitlens-cli-result';
 
 interface CliCommand {
-    command: 'compareReferences' | 'compareHead' | 'clearComparisons' | 'ping';
+    command: 'compareReferences' | 'compareHead' | 'clearComparisons' | 'ping' | 'setTerminalTitle';
     args: string[];
     timestamp: number;
 }
@@ -126,6 +126,9 @@ async function processCliCommand(commandFilePath: string, resultFilePath: string
                 break;
             case 'ping':
                 result = await executePing();
+                break;
+            case 'setTerminalTitle':
+                result = await executeSetTerminalTitle(command.args);
                 break;
             default:
                 result = {
@@ -350,6 +353,49 @@ async function executePing(): Promise<CliResult> {
             success: false,
             message: '',
             error: `Failed to execute ping: ${error instanceof Error ? error.message : String(error)}`
+        };
+    }
+}
+
+async function executeSetTerminalTitle(args: string[]): Promise<CliResult> {
+    try {
+        if (args.length < 1) {
+            return {
+                success: false,
+                message: '',
+                error: 'setTerminalTitle requires 1 argument: <title>'
+            };
+        }
+
+        const title = args.join(' '); // Join all args in case title has spaces
+        log(`Setting terminal title to: ${title}`);
+
+        // Get active terminal
+        const terminal = vscode.window.activeTerminal;
+
+        if (!terminal) {
+            return {
+                success: false,
+                message: '',
+                error: 'No active terminal found'
+            };
+        }
+
+        // Send ANSI escape sequence to set terminal title
+        // \x1b]0; sets both icon and window title
+        // \x07 is the bell character that terminates the sequence
+        terminal.sendText(`printf '\\033]0;${title}\\007'`, false);
+        log('✓ Terminal title escape sequence sent');
+
+        return {
+            success: true,
+            message: `Terminal title set to: ${title}`
+        };
+    } catch (error) {
+        return {
+            success: false,
+            message: '',
+            error: `Failed to set terminal title: ${error instanceof Error ? error.message : String(error)}`
         };
     }
 }

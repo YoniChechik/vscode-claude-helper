@@ -117,11 +117,13 @@ Usage:
   gitlens-cli compare <ref1> <ref2>     Compare two references
   gitlens-cli compare-head <ref>        Compare HEAD with a reference
   gitlens-cli clear                     Clear all comparisons
-  gitlens-cli ping                      Play a sound/notification in VS Code
+  gitlens-cli ping                      Show notification in VS Code
+  gitlens-cli set-title <title>         Set the current terminal title
   glcli compare <ref1> <ref2>           (short alias)
   glcli compare-head <ref>              (short alias)
   glcli clear                           (short alias)
   glcli ping                            (short alias)
+  glcli set-title <title>               (short alias)
 
 Examples:
   gitlens-cli compare main feature-branch
@@ -129,11 +131,13 @@ Examples:
   gitlens-cli compare-head origin/main
   gitlens-cli clear
   gitlens-cli ping
+  gitlens-cli set-title "Building Project"
 
   # Using short alias
   glcli compare main feature-branch
   glcli clear
   glcli ping
+  glcli set-title "Running Tests"
 
 Requirements:
   - Must be run from within a git repository
@@ -189,6 +193,13 @@ def main():
 
     elif args.command == "ping":
         return execute_command(workspace_root, "ping", [])
+
+    elif args.command == "set-title":
+        if len(args.args) < 1:
+            print("✗ Error: set-title requires 1 argument: <title>", file=sys.stderr)
+            print_usage()
+            return 1
+        return execute_command(workspace_root, "setTerminalTitle", args.args)
 
     else:
         print(f"✗ Error: Unknown command: {args.command}", file=sys.stderr)
