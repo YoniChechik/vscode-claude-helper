@@ -58,5 +58,8 @@
     "@typescript-eslint/parser": "^5.45.0",
     "eslint": "^8.28.0",
     "typescript": "^4.9.3"
+  },
+  "dependencies": {
+    "play-sound": "^1.1.6"
   }
 }
