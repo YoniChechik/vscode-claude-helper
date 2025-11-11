@@ -1,14 +1,14 @@
 [project]
-name = "gitlens-cli-bridge"
+name = "claude-helper"
 version = "1.0.0"
-description = "Run GitLens compare commands from the CLI - bridges terminal with VS Code's GitLens extension"
+description = "CLI tools for Claude Code - compare git refs, set terminal titles, send notifications to VS Code"
 readme = "README.md"
 requires-python = ">=3.9"
 license = { text = "MIT" }
 authors = [
     { name = "Yoni Chechik" }
 ]
-keywords = ["gitlens", "cli", "git", "compare", "branches", "vscode", "diff"]
+keywords = ["claude", "cli", "git", "compare", "terminal", "vscode", "helper"]
 classifiers = [
     "Development Status :: 4 - Beta",
     "Environment :: Console",
@@ -32,15 +32,15 @@ Repository = "https://github.com/YoniChechik/vscode-git-diff-extension"
 Issues = "https://github.com/YoniChechik/vscode-git-diff-extension/issues"
 
 [project.scripts]
-gitlens-cli = "gitlens_cli_bridge.cli:cli_main"
-glcli = "gitlens_cli_bridge.cli:cli_main"
+claude-helper = "claude_helper.cli:cli_main"
+ch = "claude_helper.cli:cli_main"
 
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
-packages = ["gitlens_cli_bridge"]
+packages = ["claude_helper"]
 
 [tool.uv.workspace]
 members = [

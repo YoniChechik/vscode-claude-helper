@@ -1,121 +1,120 @@
-# GitLens CLI Bridge
+# Claude Helper
 
-> Run GitLens comparisons from your terminal in seconds.
+CLI tools to help Claude Code interact with VS Code - compare git refs, set terminal titles, and send notifications.
 
-Bridge your command line with VS Code's GitLens extension. Compare branches, tags, and commits without leaving your terminal.
+## Installation
 
-## CLI Commands
+### 1. Install VS Code Extension
 
 ```bash
-# Compare two references (branches, tags, commits)
-gitlens-cli compare <ref1> <ref2>
-glcli compare <ref1> <ref2>
-
-# Compare HEAD with a reference
-gitlens-cli compare-head <ref>
-glcli compare-head <ref>
-
-# Clear all comparisons
-gitlens-cli clear
-glcli clear
-
-# Show help
-gitlens-cli --help
-glcli --help
+code --install-extension claude-helper
 ```
 
-### Examples
+Or install from the [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=YoniChechik.claude-helper)
+
+### 2. Install CLI Tool
+
+Using `uv` (recommended):
 
 ```bash
-# Compare branches
-glcli compare main feature-branch
+uv tool install claude-helper
+```
 
-# Compare with remote
-glcli compare origin/main HEAD
+Using `pip`:
 
-# Compare tags
-glcli compare v1.0.0 v2.0.0
-
-# Compare HEAD with main
-glcli compare-head main
-
-# Clear all comparisons
-glcli clear
+```bash
+pip install claude-helper
 ```
 
 ## Requirements
 
-- **VS Code** with **GitLens extension** (`eamodio.gitlens`)
-- **Python 3.9+**
-- **VS Code must be open** with your workspace when running commands
+- VS Code with a workspace folder open
+- GitLens extension (for git comparison features)
 
-## Installation
+## Usage
 
-### CLI Tool
-
-```bash
-# Install globally using uv (recommended)
-uv tool install gitlens-cli-bridge
-
-# Or install from source
-uv tool install .
-
-# Update to latest
-uv tool upgrade gitlens-cli-bridge
-```
-
-### VS Code Extension
+### Compare Git References
 
 ```bash
-# Package and install
-npx @vscode/vsce package
-code --install-extension gitlens-cli-bridge-1.0.0.vsix
+# Compare two branches/commits
+ch compare main feature-branch
+ch compare HEAD origin/main
 
-# Or press F5 in VS Code for development mode
+# Compare HEAD with another ref
+ch compare-head origin/main
 ```
 
-## How It Works
+### Set Terminal Title
 
-1. CLI writes command to `.gitlens-cli` file in workspace root
-2. VS Code extension watches and executes the GitLens command
-3. Extension writes result to `.gitlens-cli-result`
-4. CLI reads and displays the result
+```bash
+# Change the title of your current terminal
+ch set-title "Building Project"
+ch set-title "Running Tests"
+```
 
-Simple file-based IPC with no complex communication needed.
+### Notifications
+
+```bash
+# Show a notification in VS Code
+ch ping
+```
+
+### Clear Comparisons
+
+```bash
+# Clear all GitLens comparisons
+ch clear
+```
+
+## Command Reference
+
+| Command | Alias | Description |
+|---------|-------|-------------|
+| `claude-helper compare <ref1> <ref2>` | `ch compare` | Compare two git references |
+| `claude-helper compare-head <ref>` | `ch compare-head` | Compare HEAD with a reference |
+| `claude-helper clear` | `ch clear` | Clear all comparisons |
+| `claude-helper ping` | `ch ping` | Show notification in VS Code |
+| `claude-helper set-title <title>` | `ch set-title` | Set current terminal title |
+
+## Use Cases for Claude Code
+
+Claude Code can use these tools to:
+
+- **Compare branches** before merging or reviewing changes
+- **Label terminals** during long-running builds or tests
+- **Send notifications** when tasks complete
+- **Organize workflows** with clear terminal naming
 
 ## Troubleshooting
 
-**"Not in a git repository"** - Run from within a git repository
+### Extension Not Working
 
-**"Timeout waiting for VS Code"** - Ensure:
-- VS Code is open with the workspace
-- GitLens CLI Bridge extension is installed and activated
-- Check VS Code's "GitLens CLI Bridge" output panel for errors
+1. Ensure VS Code is open with a workspace folder
+2. Check extension is installed: `code --list-extensions | grep claude-helper`
+3. View logs in VS Code: `Ctrl+Shift+P` → `Claude Helper: Show Logs`
 
-**"GitLens command failed"** - Ensure GitLens extension is installed
+### CLI Timeout
 
-## Development
+- Make sure VS Code is running
+- Verify you're in a git repository
+- Check the extension is activated (you should see "Claude Helper activated" notification)
 
-```bash
-# Build extension
-npm run compile
+### Compare Commands Not Working
 
-# Test: Open VS Code (F5), then in terminal:
-glcli compare main HEAD
-```
+- Ensure GitLens extension is installed: `code --list-extensions | grep gitlens`
+- Verify you're in a git repository with valid refs
 
-### Project Structure
+## Documentation
 
-```
-vscode-git-diff-extension/
-├── src/
-│   └── extension.ts           # VS Code extension (file watcher)
-├── gitlens_cli_bridge/
-│   └── cli.py                 # Python CLI tool
-├── pyproject.toml             # Python package config
-└── package.json               # VS Code extension config
-```
+- [Development Guide](docs/development.md) - For contributors
+- [Debugging](docs/debugging.md) - Troubleshooting guide
+- [Publishing](docs/publishing.md) - Release process
+- [Registration](docs/registration.md) - First-time setup
 
 ## License
 
-MIT License - see LICENSE.txt for details
+MIT
+
+## Contributing
+
+Contributions welcome! See [Development Guide](docs/development.md) for setup instructions.

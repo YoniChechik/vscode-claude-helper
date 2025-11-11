@@ -1,7 +1,7 @@
 {
-  "name": "gitlens-cli-bridge",
-  "displayName": "GitLens CLI Bridge",
-  "description": "Run GitLens compare commands from the CLI (VS Code Extension - CLI tool available via: uv tool install gitlens-cli-bridge)",
+  "name": "claude-helper",
+  "displayName": "Claude Helper",
+  "description": "CLI tools for Claude Code - compare git refs, set terminal titles, notifications (VS Code Extension - CLI tool: uv tool install claude-helper)",
   "version": "1.0.0",
   "publisher": "YoniChechik",
   "author": {
@@ -17,11 +17,12 @@
   },
   "homepage": "https://github.com/YoniChechik/vscode-git-diff-extension#readme",
   "keywords": [
-    "gitlens",
+    "claude",
     "cli",
     "git",
     "compare",
-    "branches"
+    "terminal",
+    "helper"
   ],
   "engines": {
     "vscode": "^1.75.0"
@@ -36,8 +37,8 @@
   "contributes": {
     "commands": [
       {
-        "command": "gitlens-cli-bridge.showLogs",
-        "title": "GitLens CLI Bridge: Show Logs"
+        "command": "claude-helper.showLogs",
+        "title": "Claude Helper: Show Logs"
       }
     ]
   },

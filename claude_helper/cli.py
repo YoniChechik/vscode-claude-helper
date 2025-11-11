@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""GitLens CLI Bridge - Command line interface for GitLens comparisons."""
+"""Claude Helper - CLI tools for Claude Code."""
 
 import argparse
 import json
@@ -9,8 +9,8 @@ from pathlib import Path
 from typing import Optional
 
 # Constants
-CLI_COMMAND_FILE = ".gitlens-cli"
-CLI_RESULT_FILE = ".gitlens-cli-result"
+CLI_COMMAND_FILE = ".claude-helper"
+CLI_RESULT_FILE = ".claude-helper-result"
 POLL_INTERVAL = 0.1  # seconds
 TIMEOUT = 30.0  # seconds
 
@@ -111,39 +111,39 @@ def execute_command(workspace_root: Path, command: str, args: list[str]) -> int:
 def print_usage():
     """Print usage information."""
     usage = """
-GitLens CLI Bridge - Run GitLens compare commands from the CLI
+Claude Helper - CLI tools for Claude Code
 
 Usage:
-  gitlens-cli compare <ref1> <ref2>     Compare two references
-  gitlens-cli compare-head <ref>        Compare HEAD with a reference
-  gitlens-cli clear                     Clear all comparisons
-  gitlens-cli ping                      Show notification in VS Code
-  gitlens-cli set-title <title>         Set the current terminal title
-  glcli compare <ref1> <ref2>           (short alias)
-  glcli compare-head <ref>              (short alias)
-  glcli clear                           (short alias)
-  glcli ping                            (short alias)
-  glcli set-title <title>               (short alias)
+  claude-helper compare <ref1> <ref2>   Compare two git references
+  claude-helper compare-head <ref>      Compare HEAD with a reference
+  claude-helper clear                   Clear all comparisons
+  claude-helper ping                    Show notification in VS Code
+  claude-helper set-title <title>       Set the current terminal title
+  ch compare <ref1> <ref2>              (short alias)
+  ch compare-head <ref>                 (short alias)
+  ch clear                              (short alias)
+  ch ping                               (short alias)
+  ch set-title <title>                  (short alias)
 
 Examples:
-  gitlens-cli compare main feature-branch
-  gitlens-cli compare origin/main HEAD
-  gitlens-cli compare-head origin/main
-  gitlens-cli clear
-  gitlens-cli ping
-  gitlens-cli set-title "Building Project"
+  claude-helper compare main feature-branch
+  claude-helper compare origin/main HEAD
+  claude-helper compare-head origin/main
+  claude-helper clear
+  claude-helper ping
+  claude-helper set-title "Building Project"
 
   # Using short alias
-  glcli compare main feature-branch
-  glcli clear
-  glcli ping
-  glcli set-title "Running Tests"
+  ch compare main feature-branch
+  ch clear
+  ch ping
+  ch set-title "Running Tests"
 
 Requirements:
   - Must be run from within a git repository
   - VS Code must be open with the workspace
-  - GitLens extension must be installed
-  - GitLens CLI Bridge extension must be installed
+  - GitLens extension must be installed (for compare commands)
+  - Claude Helper extension must be installed in VS Code
 """
     print(usage)
 

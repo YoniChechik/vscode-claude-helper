@@ -4,11 +4,11 @@ out/
 .vscode-test/
 worktrees/
 
-# CLI Bridge files
-.gitlens-cli
-.gitlens-cli-result
-.gitlens-cli-extension.log
-.gitlens-cli-debug.json
+# Claude Helper files
+.claude-helper
+.claude-helper-result
+.claude-helper.log
+.claude-helper-debug.json
 
 # Python
 __pycache__/

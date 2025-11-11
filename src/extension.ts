@@ -2,8 +2,8 @@ import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
 
-const CLI_COMMAND_FILE = '.gitlens-cli';
-const CLI_RESULT_FILE = '.gitlens-cli-result';
+const CLI_COMMAND_FILE = '.claude-helper';
+const CLI_RESULT_FILE = '.claude-helper-result';
 
 interface CliCommand {
     command: 'compareReferences' | 'compareHead' | 'clearComparisons' | 'ping' | 'setTerminalTitle';
@@ -47,7 +47,7 @@ function log(message: string) {
 
 
 export function activate(context: vscode.ExtensionContext) {
-    outputChannel = vscode.window.createOutputChannel('GitLens CLI Bridge');
+    outputChannel = vscode.window.createOutputChannel('Claude Helper');
     context.subscriptions.push(outputChannel);
 
     // Get workspace root first
@@ -58,16 +58,16 @@ export function activate(context: vscode.ExtensionContext) {
     }
 
     // Set up log file path
-    workspaceLogPath = path.join(workspaceRoot, '.gitlens-cli-extension.log');
+    workspaceLogPath = path.join(workspaceRoot, '.claude-helper.log');
 
-    log('GitLens CLI Bridge is now active');
-    console.log('GitLens CLI Bridge is now active');
+    log('Claude Helper is now active');
+    console.log('Claude Helper is now active');
 
     // Show activation notification
-    vscode.window.showInformationMessage('GitLens CLI Bridge activated - logs in .gitlens-cli-extension.log');
+    vscode.window.showInformationMessage('Claude Helper activated - logs in .claude-helper.log');
 
     // Register command to show logs
-    const showLogsCommand = vscode.commands.registerCommand('gitlens-cli-bridge.showLogs', () => {
+    const showLogsCommand = vscode.commands.registerCommand('claude-helper.showLogs', () => {
         outputChannel.show();
     });
     context.subscriptions.push(showLogsCommand);
@@ -402,5 +402,5 @@ async function executeSetTerminalTitle(args: string[]): Promise<CliResult> {
 }
 
 export function deactivate() {
-    console.log('GitLens CLI Bridge is now deactivated');
+    console.log('Claude Helper is now deactivated');
 }

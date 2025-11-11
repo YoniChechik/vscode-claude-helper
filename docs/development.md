@@ -1,6 +1,6 @@
 # Development Guide
 
-Quick reference for developing and testing GitLens CLI Bridge.
+Quick reference for developing and testing Claude Helper.
 
 ## Two Components
 
@@ -8,13 +8,13 @@ This project has **two separate components** that need to be reinstalled indepen
 
 1. **VS Code Extension** (`src/extension.ts` → `out/extension.js`)
    - Runs inside VS Code
-   - Listens for CLI commands and executes GitLens commands
+   - Listens for CLI commands and executes VS Code commands
    - **Reinstall after:** Changing `src/extension.ts`
 
-2. **CLI Tool** (`gitlens_cli_bridge/cli.py`)
+2. **CLI Tool** (`claude_helper/cli.py`)
    - Python script installed via `uv tool install`
    - Writes command files for the extension to process
-   - **Reinstall after:** Changing `gitlens_cli_bridge/cli.py`
+   - **Reinstall after:** Changing `claude_helper/cli.py`
 
 ## Force Reinstall Extension
 
@@ -22,7 +22,7 @@ This project has **two separate components** that need to be reinstalled indepen
 
 ```bash
 # Compile, package, and force install in one go
-npm run compile && npx @vscode/vsce package && code --install-extension gitlens-cli-bridge-1.0.0.vsix --force
+npm run compile && npx @vscode/vsce package && code --install-extension claude-helper-1.0.0.vsix --force
 ```
 
 Then in VS Code:
@@ -32,14 +32,14 @@ Then in VS Code:
 
 ```bash
 # 1. Uninstall
-code --uninstall-extension gitlens-cli-bridge
+code --uninstall-extension claude-helper
 
 # 2. Compile and package
 npm run compile
 npx @vscode/vsce package
 
 # 3. Install
-code --install-extension gitlens-cli-bridge-1.0.0.vsix
+code --install-extension claude-helper-1.0.0.vsix
 
 # 4. Reload VS Code
 # Press Ctrl+Shift+P → "Developer: Reload Window"
@@ -63,10 +63,10 @@ Best for rapid iteration:
 uv tool install --force .
 
 # Full reinstall (clears cache - use if changes not applying)
-uv cache clean && uv tool uninstall gitlens-cli-bridge && uv tool install .
+uv cache clean && uv tool uninstall claude-helper && uv tool install .
 
 # Or reinstall from PyPI (when published)
-uv tool upgrade gitlens-cli-bridge
+uv tool upgrade claude-helper
 ```
 
 **Note:** If you modify `cli.py` and reinstall but still see old behavior, UV may be using a cached build. Use the "Full reinstall" command above to clear the cache.
@@ -75,7 +75,7 @@ uv tool upgrade gitlens-cli-bridge
 
 ```bash
 # Uninstall old version
-pip uninstall gitlens-cli-bridge -y
+pip uninstall claude-helper -y
 
 # Install from local source
 pip install .
@@ -84,7 +84,7 @@ pip install .
 ### When to Reinstall CLI Tool
 
 You **need** to reinstall the CLI tool when:
-- ✅ You modify `gitlens_cli_bridge/cli.py`
+- ✅ You modify `claude_helper/cli.py`
 - ✅ You modify `pyproject.toml` (CLI dependencies/metadata)
 
 You **don't need** to reinstall when:
@@ -101,33 +101,33 @@ vim src/extension.ts
 
 # 2. Compile and reinstall extension
 npm run compile
-npx @vscode/vsce package && code --install-extension gitlens-cli-bridge-1.0.0.vsix --force
+npx @vscode/vsce package && code --install-extension claude-helper-1.0.0.vsix --force
 
 # 3. Reload VS Code window
 # Ctrl+Shift+P → "Developer: Reload Window"
 
 # 4. Test CLI
-glcli clear
+ch clear
 
 # 5. Check logs (if debugging)
-# Ctrl+Shift+P → "GitLens CLI Bridge: Show Logs"
+# Ctrl+Shift+P → "Claude Helper: Show Logs"
 ```
 
 ### When Modifying CLI (Python)
 
 ```bash
 # 1. Make changes to CLI code
-vim gitlens_cli_bridge/cli.py
+vim claude_helper/cli.py
 
 # 2. Reinstall CLI tool
 uv tool install --force .
 
 # 3. Test CLI directly
-glcli clear
-glcli compare main HEAD
+ch clear
+ch compare main HEAD
 
 # 4. Check result (if debugging)
-cat .gitlens-cli-result
+cat .claude-helper-result
 ```
 
 ## Debugging
@@ -138,8 +138,8 @@ cat .gitlens-cli-result
 Since the extension runs in VS Code, you MUST view logs from within VS Code:
 
 1. Open VS Code with your workspace
-2. Press `Ctrl+Shift+P` → `GitLens CLI Bridge: Show Logs`
-3. Or: `Ctrl+Shift+U` → Select "GitLens CLI Bridge" from dropdown
+2. Press `Ctrl+Shift+P` → `Claude Helper: Show Logs`
+3. Or: `Ctrl+Shift+U` → Select "Claude Helper" from dropdown
 
 The logs will show:
 - Which commands are being tried
@@ -149,7 +149,7 @@ The logs will show:
 **From CLI (limited):**
 The CLI will attempt to print logs if available:
 ```bash
-glcli clear
+ch clear
 # Should show:
 # --- Extension Logs ---
 # [timestamp] log messages...
@@ -162,11 +162,11 @@ glcli clear
 
 ```bash
 # In VS Code, you should see notification:
-# "GitLens CLI Bridge activated - check Output panel"
+# "Claude Helper activated - check Output panel"
 
 # Or check installed extensions:
 # Ctrl+Shift+P → "Extensions: Show Installed Extensions"
-# Search for "GitLens CLI Bridge"
+# Search for "Claude Helper"
 ```
 
 ### Debug Extension in Development Mode
@@ -186,7 +186,7 @@ glcli clear
 **CLI timeout:**
 - Ensure VS Code is open with the workspace
 - Check that the extension is activated (see notification)
-- Verify `.gitlens-cli` file is created in workspace root
+- Verify `.claude-helper` file is created in workspace root
 
 **Commands not working:**
 - Check the logs for specific error messages
@@ -198,7 +198,7 @@ glcli clear
 ```
 ├── src/
 │   └── extension.ts           # VS Code extension (TypeScript)
-├── gitlens_cli_bridge/
+├── claude_helper/
 │   └── cli.py                 # Python CLI tool
 ├── out/                       # Compiled TypeScript output
 ├── package.json               # Extension config
@@ -225,10 +225,10 @@ npx @vscode/vsce ls
 uv tool install --force .
 
 # Test CLI
-glcli compare main HEAD
-glcli compare-head origin/main
-glcli clear
-glcli --help
+ch compare main HEAD
+ch compare-head origin/main
+ch clear
+ch --help
 ```
 
 ## Publishing
