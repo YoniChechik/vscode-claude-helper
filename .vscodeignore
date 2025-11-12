@@ -8,3 +8,9 @@ vsc-extension-quickstart.md
 **/.eslintrc.json
 **/*.map
 **/*.ts
+_worktrees/**
+.claude-helper.log
+.claude-helper-debug.json
+.gitlens-cli-extension.log
+test-http.sh
+claude-helper-*.vsix

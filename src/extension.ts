@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
+import { initializePortListener } from './portListener';
 
 const CLI_COMMAND_FILE = '.claude-helper';
 const CLI_RESULT_FILE = '.claude-helper-result';
@@ -71,6 +72,29 @@ export function activate(context: vscode.ExtensionContext) {
         outputChannel.show();
     });
     context.subscriptions.push(showLogsCommand);
+
+    // Initialize port listener
+    const portListenerPort = 3456; // Using a specific port for Claude Helper
+    const commandHandlers = new Map<string, (args: string[]) => Promise<CliResult>>([
+        ['compareReferences', executeCompareReferences],
+        ['compareHead', executeCompareHead],
+        ['clearComparisons', executeClearComparisons],
+        ['ping', executePing],
+        ['pingTerminalTitle', executePingTerminalTitle],
+        ['setTerminalTitle', executeSetTerminalTitle]
+    ]);
+
+    try {
+        log('Attempting to initialize HTTP port listener...');
+        console.log('Attempting to initialize HTTP port listener...');
+        initializePortListener(context, portListenerPort, commandHandlers);
+        log('Port listener initialization call completed');
+        console.log('Port listener initialization call completed');
+    } catch (error) {
+        log(`Failed to initialize port listener: ${error}`);
+        console.error('Failed to initialize port listener:', error);
+        vscode.window.showErrorMessage(`Claude Helper: Failed to start HTTP listener - ${error}`);
+    }
 
     const commandFilePath = path.join(workspaceRoot, CLI_COMMAND_FILE);
     const resultFilePath = path.join(workspaceRoot, CLI_RESULT_FILE);
@@ -343,15 +367,12 @@ async function executePing(args: string[]): Promise<CliResult> {
     try {
         log('Ping command received');
 
-        // args[0] is timestamp, rest is custom message
-        const timestamp = args.length > 0 ? args[0] : '';
-        const customMessage = args.length > 1 ? args.slice(1).join(' ') : '';
+        // Use current time as timestamp
+        const timestamp = new Date().toLocaleTimeString();
+        const customMessage = args.length > 0 ? args.join(' ') : '';
 
         // Build notification message
-        let notificationMsg = '🔔 Ping!';
-        if (timestamp) {
-            notificationMsg += ` [${timestamp}]`;
-        }
+        let notificationMsg = `🔔 Ping! [${timestamp}]`;
         if (customMessage) {
             notificationMsg += ` ${customMessage}`;
         }
@@ -392,8 +413,8 @@ async function executePingTerminalTitle(args: string[]): Promise<CliResult> {
         const terminalTitle = terminal.name;
         log(`Terminal title: ${terminalTitle}`);
 
-        // Get timestamp from args if provided, or use current time
-        const timestamp = args.length > 0 ? args[0] : new Date().toLocaleString();
+        // Use current time as timestamp
+        const timestamp = new Date().toLocaleTimeString();
 
         // Build notification message
         const notificationMsg = `🔔 Ping! [${timestamp}] Terminal: ${terminalTitle}`;
