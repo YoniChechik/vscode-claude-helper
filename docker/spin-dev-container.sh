@@ -55,8 +55,8 @@ echo "Creating container: $CONTAINER_NAME"
 cd "$REPO_ROOT"
 
 # Create container using dev service with volume mount
-COMPOSE_BAKE=true docker compose -f "$DOCKER_DIR/docker-compose.yml" build dev
-docker compose -f "$DOCKER_DIR/docker-compose.yml" run -d --name "$CONTAINER_NAME" dev sleep infinity
+COMPOSE_BAKE=true docker compose -f "$DOCKER_DIR/docker-compose.yml" build dev-vscode-claude-helper
+docker compose -f "$DOCKER_DIR/docker-compose.yml" run -d --name "$CONTAINER_NAME" dev-vscode-claude-helper sleep infinity
 
 echo "Repository mounted from host: $REPO_ROOT"
 echo "Worktrees will be inside: $REPO_ROOT/worktrees"

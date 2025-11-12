@@ -24,7 +24,7 @@ x-build: &build
   dockerfile: docker/Dockerfile
 
 services:
-  dev:
+  dev-vscode-claude-helper:
     <<: *default
     build:
       <<: *build
