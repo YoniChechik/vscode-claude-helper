@@ -1,38 +1,16 @@
 # Claude Helper
 
-CLI tools to help Claude Code interact with VS Code - compare git refs, set terminal titles, and send notifications.
+VS Code extension with HTTP API to help Claude Code interact with VS Code - compare git refs, set terminal titles, and send notifications.
 
 ## Installation
 
-### 1. Install VS Code Extension
+Install the VS Code extension:
 
 ```bash
 code --install-extension claude-helper
 ```
 
 Or install from the [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=YoniChechik.claude-helper)
-
-### 2. Install CLI Tool
-
-**From PyPI** (recommended):
-
-```bash
-# Using uv
-uv tool install claude-helper
-
-# Using pip
-pip install claude-helper
-```
-
-**From GitHub** (latest development version):
-
-```bash
-# Using uv
-uv tool install git+https://github.com/YoniChechik/vscode-claude-helper.git
-
-# Using pip
-pip install git+https://github.com/YoniChechik/vscode-claude-helper.git
-```
 
 ## Requirements
 
@@ -41,60 +19,68 @@ pip install git+https://github.com/YoniChechik/vscode-claude-helper.git
 
 ## Usage
 
-### Compare Git References
+The extension listens on `http://localhost:3456` when VS Code is running. Send commands via HTTP POST requests:
+
+### Send Notifications
 
 ```bash
-# Compare two branches/commits
-ch compare main feature-branch
-ch compare HEAD origin/main
+# Show a notification with custom message
+curl -X POST http://localhost:3456 \
+  -H "Content-Type: application/json" \
+  -d '{"command":"ping","args":["Build completed successfully"]}'
 
-# Compare HEAD with another ref
-ch compare-head origin/main
+# Show notification with current terminal title
+curl -X POST http://localhost:3456 \
+  -H "Content-Type: application/json" \
+  -d '{"command":"pingTerminalTitle","args":[]}'
 ```
 
 ### Set Terminal Title
 
 ```bash
 # Change the title of your current terminal
-ch set-title "Building Project"
-ch set-title "Running Tests"
+curl -X POST http://localhost:3456 \
+  -H "Content-Type: application/json" \
+  -d '{"command":"setTerminalTitle","args":["Building Project"]}'
 ```
 
-### Notifications
+### Compare Git References
 
 ```bash
-# Show a notification in VS Code with timestamp
-ch ping
+# Compare two branches/commits
+curl -X POST http://localhost:3456 \
+  -H "Content-Type: application/json" \
+  -d '{"command":"compareReferences","args":["main","HEAD"]}'
 
-# Show notification with custom message
-ch ping "Build completed successfully"
-ch ping "Tests passed - 127 tests ran in 2.3s"
-
-# Show notification with current terminal title
-ch ping-terminal-title
+# Compare HEAD with another ref
+curl -X POST http://localhost:3456 \
+  -H "Content-Type: application/json" \
+  -d '{"command":"compareHead","args":["origin/main"]}'
 ```
 
 ### Clear Comparisons
 
 ```bash
 # Clear all GitLens comparisons
-ch clear
+curl -X POST http://localhost:3456 \
+  -H "Content-Type: application/json" \
+  -d '{"command":"clearComparisons","args":[]}'
 ```
 
-## Command Reference
+## Available Commands
 
-| Command | Alias | Description |
-|---------|-------|-------------|
-| `claude-helper compare <ref1> <ref2>` | `ch compare` | Compare two git references |
-| `claude-helper compare-head <ref>` | `ch compare-head` | Compare HEAD with a reference |
-| `claude-helper clear` | `ch clear` | Clear all comparisons |
-| `claude-helper ping [message]` | `ch ping` | Show notification with timestamp and optional message |
-| `claude-helper ping-terminal-title` | `ch ping-terminal-title` | Show notification with current terminal title |
-| `claude-helper set-title <title>` | `ch set-title` | Set current terminal title |
+| Command | Arguments | Description |
+|---------|-----------|-------------|
+| `ping` | `[message]` (optional) | Show notification with timestamp and optional message |
+| `pingTerminalTitle` | none | Show notification with current terminal title |
+| `setTerminalTitle` | `title` (string) | Set current terminal title |
+| `compareReferences` | `ref1, ref2` (strings) | Compare two git references |
+| `compareHead` | `ref` (string) | Compare HEAD with a reference |
+| `clearComparisons` | none | Clear all GitLens comparisons |
 
 ## Use Cases for Claude Code
 
-Claude Code can use these tools to:
+Claude Code can use this extension to:
 
 - **Compare branches** before merging or reviewing changes
 - **Label terminals** during long-running builds or tests
@@ -109,11 +95,11 @@ Claude Code can use these tools to:
 2. Check extension is installed: `code --list-extensions | grep claude-helper`
 3. View logs in VS Code: `Ctrl+Shift+P` → `Claude Helper: Show Logs`
 
-### CLI Timeout
+### Connection Refused
 
-- Make sure VS Code is running
-- Verify you're in a git repository
-- Check the extension is activated (you should see "Claude Helper activated" notification)
+- Make sure VS Code is running with the extension activated
+- Check logs for "HTTP listener started on http://127.0.0.1:3456"
+- Ensure no other process is using port 3456
 
 ### Compare Commands Not Working
 
@@ -123,9 +109,7 @@ Claude Code can use these tools to:
 ## Documentation
 
 - [Development Guide](docs/development.md) - For contributors
-- [Debugging](docs/debugging.md) - Troubleshooting guide
 - [Publishing](docs/publishing.md) - Release process
-- [Registration](docs/registration.md) - First-time setup
 
 ## License
 

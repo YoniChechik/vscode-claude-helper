@@ -9,7 +9,6 @@ const CLI_RESULT_FILE = '.claude-helper-result';
 interface CliCommand {
     command: 'compareReferences' | 'compareHead' | 'clearComparisons' | 'ping' | 'pingTerminalTitle' | 'setTerminalTitle';
     args: string[];
-    timestamp: number;
 }
 
 interface CliResult {

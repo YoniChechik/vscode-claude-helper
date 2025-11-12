@@ -25,22 +25,22 @@ The extension listens on `http://localhost:3456` when VS Code is running. Test c
 # Send a notification
 curl -X POST http://localhost:3456 \
   -H "Content-Type: application/json" \
-  -d '{"command":"ping","args":["Hello from curl!"],"timestamp":1234567890}'
+  -d '{"command":"ping","args":["Hello from curl!"]}'
 
 # Set terminal title
 curl -X POST http://localhost:3456 \
   -H "Content-Type: application/json" \
-  -d '{"command":"setTerminalTitle","args":["My Terminal"],"timestamp":1234567890}'
+  -d '{"command":"setTerminalTitle","args":["My Terminal"]}'
 
 # Compare git references
 curl -X POST http://localhost:3456 \
   -H "Content-Type: application/json" \
-  -d '{"command":"compareReferences","args":["main","HEAD"],"timestamp":1234567890}'
+  -d '{"command":"compareReferences","args":["main","HEAD"]}'
 
 # Clear comparisons
 curl -X POST http://localhost:3456 \
   -H "Content-Type: application/json" \
-  -d '{"command":"clearComparisons","args":[],"timestamp":1234567890}'
+  -d '{"command":"clearComparisons","args":[]}'
 ```
 
 Available commands:
@@ -72,7 +72,7 @@ code --install-extension claude-helper-*.vsix --force
 # 5. Test with curl
 curl -X POST http://localhost:3456 \
   -H "Content-Type: application/json" \
-  -d '{"command":"ping","args":["Extension updated!"],"timestamp":1234567890}'
+  -d '{"command":"ping","args":["Extension updated!"]}'
 ```
 
 **Quick compile & reload:**
@@ -127,7 +127,7 @@ npx @vscode/vsce ls
 # Test with curl
 curl -X POST http://localhost:3456 \
   -H "Content-Type: application/json" \
-  -d '{"command":"ping","args":["Test"],"timestamp":1234567890}'
+  -d '{"command":"ping","args":["Test"]}'
 ```
 
 ## Publishing

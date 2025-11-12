@@ -4,7 +4,6 @@ import * as http from 'http';
 interface CliCommand {
     command: string;
     args: string[];
-    timestamp: number;
 }
 
 interface CliResult {
