@@ -1,0 +1,69 @@
+# Registration & First-Time Setup
+
+Guide for registering and publishing Claude Helper for the first time.
+
+## Create VS Code Marketplace Publisher - one time setup
+
+1. **Create Microsoft/Azure Account**
+   - Go to https://dev.azure.com
+   - Sign in or create a new account
+
+2. **Create Publisher**
+   - Go to https://marketplace.visualstudio.com/manage
+   - Click "Create publisher"
+   - Choose a unique publisher ID (e.g., "YoniChechik")
+   - Fill in display name, description, etc.
+
+3. **Get Personal Access Token (PAT)**
+   - Go to https://dev.azure.com
+   - User Settings → Personal Access Tokens
+   - Click "New Token"
+   - Name: "vscode-marketplace"
+   - Organization: All accessible organizations
+   - Expiration: Custom (set to 1 year)
+   - Scopes:
+     - **Marketplace: Manage** (important!)
+   - Copy and save the token securely
+
+
+## Initial Setup
+
+### Configure package.json
+
+Ensure your publisher matches your VS Code Marketplace publisher:
+
+```json
+{
+  "publisher": "YourPublisherID",
+  "name": "claude-helper",
+  "version": "1.0.0"
+}
+```
+
+
+## First Publication
+
+### 1. Install vsce (VS Code Extension Manager)
+
+```bash
+npm install -g @vscode/vsce
+```
+
+### 2. Login to VS Code Marketplace
+
+```bash
+vsce login YourPublisherID
+# Enter your Personal Access Token when prompted
+```
+
+### 3. Publish Extension
+
+```bash
+# Package and publish
+vsce publish
+
+# Or manually:
+vsce package
+vsce publish --packagePath ./claude-helper-1.0.0.vsix
+```
+
