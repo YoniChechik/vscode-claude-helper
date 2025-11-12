@@ -15,15 +15,7 @@ Guide for registering and publishing Claude Helper for the first time.
    - Fill in display name, description, etc.
 
 3. **Get Personal Access Token (PAT)**
-   - Go to https://dev.azure.com
-   - User Settings → Personal Access Tokens
-   - Click "New Token"
-   - Name: "vscode-marketplace"
-   - Organization: All accessible organizations
-   - Expiration: Custom (set to 1 year)
-   - Scopes:
-     - **Marketplace: Manage** (important!)
-   - Copy and save the token securely
+   https://dev.azure.com/chechikyoni/_usersSettings/tokens 
 
 
 ## Initial Setup
