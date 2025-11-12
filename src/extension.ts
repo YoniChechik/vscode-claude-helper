@@ -72,6 +72,17 @@ export function activate(context: vscode.ExtensionContext) {
     });
     context.subscriptions.push(showLogsCommand);
 
+    // Register command to open Claude terminal
+    const openClaudeTerminalCommand = vscode.commands.registerCommand('claude-helper.openClaudeTerminal', () => {
+        const terminal = vscode.window.createTerminal('Claude');
+        terminal.show();
+        // Wait for terminal to be ready before sending text
+        setTimeout(() => {
+            terminal.sendText('claude', true);
+        }, 500);
+    });
+    context.subscriptions.push(openClaudeTerminalCommand);
+
     // Initialize port listener
     const portListenerPort = 3456; // Using a specific port for Claude Helper
     const commandHandlers = new Map<string, (args: string[]) => Promise<CliResult>>([

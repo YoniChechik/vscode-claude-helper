@@ -39,6 +39,10 @@
       {
         "command": "claude-helper.showLogs",
         "title": "Claude Helper: Show Logs"
+      },
+      {
+        "command": "claude-helper.openClaudeTerminal",
+        "title": "Claude Helper: Open Claude Terminal"
       }
     ]
   },
