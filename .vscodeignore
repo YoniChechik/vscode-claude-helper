@@ -14,3 +14,4 @@ _worktrees/**
 .gitlens-cli-extension.log
 test-http.sh
 claude-helper-*.vsix
+.env
