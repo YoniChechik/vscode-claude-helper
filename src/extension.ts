@@ -7,7 +7,7 @@ const CLI_COMMAND_FILE = '.claude-helper';
 const CLI_RESULT_FILE = '.claude-helper-result';
 
 interface CliCommand {
-    command: 'compareReferences' | 'compareHead' | 'clearComparisons' | 'ping' | 'pingTerminalTitle' | 'setTerminalTitle';
+    command: 'compareReferences' | 'compareHead' | 'clearComparisons' | 'ping' | 'setTerminalTitle';
     args: string[];
 }
 
@@ -45,6 +45,184 @@ function log(message: string) {
     }
 }
 
+function generateUniqueTerminalTitle(): string {
+    const adjectives = ['sleeping', 'happy', 'dancing', 'coding', 'thinking', 'running', 'jumping', 'flying', 'swimming', 'clever', 'wise', 'bright', 'swift', 'gentle', 'brave'];
+    const nouns = ['hamster', 'panda', 'koala', 'penguin', 'dolphin', 'owl', 'fox', 'wolf', 'bear', 'tiger', 'eagle', 'hawk', 'lion', 'deer', 'rabbit'];
+
+    const randomAdjective = adjectives[Math.floor(Math.random() * adjectives.length)];
+    const randomNoun = nouns[Math.floor(Math.random() * nouns.length)];
+
+    return `claude-${randomAdjective}-${randomNoun}`;
+}
+
+function findTerminalByTitle(title: string): vscode.Terminal | undefined {
+    const terminals = vscode.window.terminals;
+
+    for (const terminal of terminals) {
+        if (terminal.name === title) {
+            log(`✓ Found terminal: ${terminal.name}`);
+            return terminal;
+        }
+    }
+
+    log(`✗ Terminal with title "${title}" not found`);
+    log(`Available terminals: ${terminals.map(t => t.name).join(', ')}`);
+    return undefined;
+}
+
+// Levenshtein distance for fuzzy matching
+function levenshteinDistance(a: string, b: string): number {
+    const matrix: number[][] = [];
+
+    for (let i = 0; i <= b.length; i++) {
+        matrix[i] = [i];
+    }
+
+    for (let j = 0; j <= a.length; j++) {
+        matrix[0][j] = j;
+    }
+
+    for (let i = 1; i <= b.length; i++) {
+        for (let j = 1; j <= a.length; j++) {
+            if (b.charAt(i - 1) === a.charAt(j - 1)) {
+                matrix[i][j] = matrix[i - 1][j - 1];
+            } else {
+                matrix[i][j] = Math.min(
+                    matrix[i - 1][j - 1] + 1,
+                    matrix[i][j - 1] + 1,
+                    matrix[i - 1][j] + 1
+                );
+            }
+        }
+    }
+
+    return matrix[b.length][a.length];
+}
+
+// Get all git references (branches, tags, worktrees)
+async function getAllGitReferences(): Promise<string[]> {
+    const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+    if (!workspaceFolder) {
+        return [];
+    }
+
+    const gitExtension = vscode.extensions.getExtension('vscode.git')?.exports;
+    const git = gitExtension?.getAPI(1);
+
+    if (!git || git.repositories.length === 0) {
+        return [];
+    }
+
+    const repo = git.repositories[0];
+    const refs: string[] = [];
+
+    try {
+        // Get local branches
+        const localBranches = repo.state.refs
+            .filter((ref: any) => ref.type === 0) // RefType.Head
+            .map((ref: any) => ref.name || '');
+        refs.push(...localBranches);
+
+        // Get remote branches
+        const remoteBranches = repo.state.refs
+            .filter((ref: any) => ref.type === 1) // RefType.RemoteHead
+            .map((ref: any) => ref.name || '');
+        refs.push(...remoteBranches);
+
+        // Get tags
+        const tags = repo.state.refs
+            .filter((ref: any) => ref.type === 2) // RefType.Tag
+            .map((ref: any) => ref.name || '');
+        refs.push(...tags);
+
+        // Get recent commits (HEAD~N format)
+        for (let i = 0; i <= 10; i++) {
+            refs.push(`HEAD~${i}`);
+        }
+
+        // Add common references
+        refs.push('HEAD', 'ORIG_HEAD', 'FETCH_HEAD', 'MERGE_HEAD');
+
+        // Try to get worktrees using git command
+        try {
+            const { execSync } = require('child_process');
+            const worktreeOutput = execSync('git worktree list --porcelain', {
+                cwd: workspaceFolder.uri.fsPath,
+                encoding: 'utf-8'
+            });
+
+            const worktreeLines = worktreeOutput.split('\n');
+            for (const line of worktreeLines) {
+                if (line.startsWith('branch ')) {
+                    const branch = line.substring(7).trim().replace('refs/heads/', '');
+                    if (branch && !refs.includes(branch)) {
+                        refs.push(branch);
+                    }
+                }
+            }
+        } catch (e) {
+            // Worktrees command failed, skip
+            log(`Failed to get worktrees: ${e}`);
+        }
+
+    } catch (error) {
+        log(`Error getting git references: ${error}`);
+    }
+
+    return refs.filter(ref => ref.length > 0);
+}
+
+// Find closest matching git reference
+async function findClosestGitReference(userInput: string): Promise<string> {
+    const allRefs = await getAllGitReferences();
+
+    if (allRefs.length === 0) {
+        // No refs found, return user input as-is
+        return userInput;
+    }
+
+    // Check for exact match first
+    if (allRefs.includes(userInput)) {
+        log(`✓ Exact match found: ${userInput}`);
+        return userInput;
+    }
+
+    // Check for case-insensitive exact match
+    const lowerInput = userInput.toLowerCase();
+    const caseInsensitiveMatch = allRefs.find(ref => ref.toLowerCase() === lowerInput);
+    if (caseInsensitiveMatch) {
+        log(`✓ Case-insensitive match found: ${caseInsensitiveMatch} (from input: ${userInput})`);
+        return caseInsensitiveMatch;
+    }
+
+    // Check for substring match
+    const substringMatches = allRefs.filter(ref =>
+        ref.toLowerCase().includes(lowerInput) || lowerInput.includes(ref.toLowerCase())
+    );
+
+    if (substringMatches.length > 0) {
+        // Return the shortest substring match (likely the most specific)
+        const bestMatch = substringMatches.reduce((a, b) => a.length <= b.length ? a : b);
+        log(`✓ Substring match found: ${bestMatch} (from input: ${userInput})`);
+        return bestMatch;
+    }
+
+    // Use Levenshtein distance for fuzzy matching
+    let bestMatch = allRefs[0];
+    let bestDistance = levenshteinDistance(userInput.toLowerCase(), bestMatch.toLowerCase());
+
+    for (const ref of allRefs) {
+        const distance = levenshteinDistance(userInput.toLowerCase(), ref.toLowerCase());
+        if (distance < bestDistance) {
+            bestDistance = distance;
+            bestMatch = ref;
+        }
+    }
+
+    log(`✓ Fuzzy match found: ${bestMatch} (from input: ${userInput}, distance: ${bestDistance})`);
+    return bestMatch;
+}
+
 
 export function activate(context: vscode.ExtensionContext) {
     outputChannel = vscode.window.createOutputChannel('Claude Helper');
@@ -74,10 +252,12 @@ export function activate(context: vscode.ExtensionContext) {
 
     // Register command to open Claude terminal
     const openClaudeTerminalCommand = vscode.commands.registerCommand('claude-helper.openClaudeTerminal', () => {
-        const terminal = vscode.window.createTerminal('Claude');
+        const uniqueTitle = generateUniqueTerminalTitle();
+        const terminal = vscode.window.createTerminal(uniqueTitle);
         terminal.show();
-        // Wait for terminal to be ready before sending text
+        // Wait for terminal to be ready, export the terminal title, then run claude
         setTimeout(() => {
+            terminal.sendText(`export CLAUDE_HELPER_CURRENT_TERMINAL_TITLE="${uniqueTitle}"`, true);
             terminal.sendText('claude', true);
         }, 500);
     });
@@ -90,7 +270,6 @@ export function activate(context: vscode.ExtensionContext) {
         ['compareHead', executeCompareHead],
         ['clearComparisons', executeClearComparisons],
         ['ping', executePing],
-        ['pingTerminalTitle', executePingTerminalTitle],
         ['setTerminalTitle', executeSetTerminalTitle]
     ]);
 
@@ -161,9 +340,6 @@ async function processCliCommand(commandFilePath: string, resultFilePath: string
             case 'ping':
                 result = await executePing(command.args);
                 break;
-            case 'pingTerminalTitle':
-                result = await executePingTerminalTitle(command.args);
-                break;
             case 'setTerminalTitle':
                 result = await executeSetTerminalTitle(command.args);
                 break;
@@ -213,7 +389,14 @@ async function executeCompareReferences(args: string[]): Promise<CliResult> {
         };
     }
 
-    const [ref1, ref2] = args;
+    const [userRef1, userRef2] = args;
+
+    // Find closest matching git references
+    const ref1 = await findClosestGitReference(userRef1);
+    const ref2 = await findClosestGitReference(userRef2);
+
+    log(`compareReferences: User input "${userRef1}" matched to "${ref1}"`);
+    log(`compareReferences: User input "${userRef2}" matched to "${ref2}"`);
 
     try {
         const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
@@ -305,10 +488,15 @@ async function executeCompareHead(args: string[]): Promise<CliResult> {
         };
     }
 
-    const [ref] = args;
+    const [userRef] = args;
 
-    // Just delegate to executeCompareReferences with HEAD as first ref
-    return executeCompareReferences(['HEAD', ref]);
+    // Find closest matching git reference
+    const matchedRef = await findClosestGitReference(userRef);
+
+    log(`compareHead: User input "${userRef}" matched to "${matchedRef}"`);
+
+    // Delegate to executeCompareReferences with HEAD as first ref
+    return executeCompareReferences(['HEAD', matchedRef]);
 }
 
 async function executeClearComparisons(): Promise<CliResult> {
@@ -404,82 +592,76 @@ async function executePing(args: string[]): Promise<CliResult> {
     }
 }
 
-async function executePingTerminalTitle(args: string[]): Promise<CliResult> {
-    try {
-        log('Ping terminal title command received');
-
-        // Get active terminal
-        const terminal = vscode.window.activeTerminal;
-
-        if (!terminal) {
-            return {
-                success: false,
-                message: '',
-                error: 'No active terminal found'
-            };
-        }
-
-        // Get terminal title
-        const terminalTitle = terminal.name;
-        log(`Terminal title: ${terminalTitle}`);
-
-        // Use current time as timestamp
-        const timestamp = new Date().toLocaleTimeString();
-
-        // Build notification message
-        const notificationMsg = `🔔 Ping! [${timestamp}] Terminal: ${terminalTitle}`;
-
-        // Show notification
-        vscode.window.showInformationMessage(notificationMsg);
-        log(`✓ Notification shown: ${notificationMsg}`);
-
-        return {
-            success: true,
-            message: `Ping! Notification shown with terminal title: ${notificationMsg}`
-        };
-    } catch (error) {
-        return {
-            success: false,
-            message: '',
-            error: `Failed to execute ping terminal title: ${error instanceof Error ? error.message : String(error)}`
-        };
-    }
-}
-
 async function executeSetTerminalTitle(args: string[]): Promise<CliResult> {
     try {
         if (args.length < 1) {
             return {
                 success: false,
                 message: '',
-                error: 'setTerminalTitle requires 1 argument: <title>'
+                error: 'setTerminalTitle requires at least 1 argument: <new_title> [current_title]'
             };
         }
 
-        const title = args.join(' '); // Join all args in case title has spaces
-        log(`Setting terminal title to: ${title}`);
+        const newTitle = args[0];
+        const currentTitle = args.length > 1 ? args[1] : '';
+        let targetTerminal: vscode.Terminal | undefined;
+        let oldTitle = '';
 
-        // Get active terminal
-        const terminal = vscode.window.activeTerminal;
+        // If currentTitle is provided and not empty, search by title
+        if (currentTitle) {
+            log(`Searching for terminal with title: ${currentTitle}`);
+            log(`Will rename to: ${newTitle}`);
 
-        if (!terminal) {
-            return {
-                success: false,
-                message: '',
-                error: 'No active terminal found'
-            };
+            targetTerminal = findTerminalByTitle(currentTitle);
+
+            if (!targetTerminal) {
+                log(`Terminal with title "${currentTitle}" not found, falling back to active terminal`);
+                targetTerminal = vscode.window.activeTerminal;
+
+                if (!targetTerminal) {
+                    return {
+                        success: false,
+                        message: '',
+                        error: 'Terminal not found and no active terminal available'
+                    };
+                }
+
+                log(`Using active terminal as fallback: ${targetTerminal.name}`);
+            }
+
+            oldTitle = targetTerminal.name;
+        } else {
+            // No currentTitle provided, use active terminal
+            log(`No current title provided, using active terminal`);
+            log(`Will rename to: ${newTitle}`);
+
+            targetTerminal = vscode.window.activeTerminal;
+
+            if (!targetTerminal) {
+                return {
+                    success: false,
+                    message: '',
+                    error: 'No active terminal found'
+                };
+            }
+
+            oldTitle = targetTerminal.name;
+            log(`Active terminal: ${oldTitle}`);
         }
+
+        // Show the terminal first to make it active, then rename
+        targetTerminal.show();
 
         // Use VS Code's built-in command to rename terminal
         await vscode.commands.executeCommand('workbench.action.terminal.renameWithArg', {
-            name: title
+            name: newTitle
         });
 
         log('✓ Terminal renamed using VS Code API');
 
         return {
             success: true,
-            message: `Terminal title set to: ${title}`
+            message: `Terminal title changed from "${oldTitle}" to "${newTitle}"`
         };
     } catch (error) {
         return {

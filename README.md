@@ -21,6 +21,16 @@ Or install from the [VS Code Marketplace](https://marketplace.visualstudio.com/i
 
 The extension listens on `http://localhost:3456` when VS Code is running. Send commands via HTTP POST requests:
 
+## Available Commands
+
+| Command | Arguments | Description |
+|---------|-----------|-------------|
+| `ping` | `[message]` (optional) | Show notification with timestamp and optional message (can include `$CLAUDE_HELPER_CURRENT_TERMINAL_TITLE`) |
+| `setTerminalTitle` | `new_title, [current_title]` | Rename terminal (with optional targeting) |
+| `compareReferences` | `ref1, ref2` (strings) | Compare two git references |
+| `compareHead` | `ref` (string) | Compare HEAD with a reference |
+| `clearComparisons` | none | Clear all GitLens comparisons |
+
 ### Send Notifications
 
 ```bash
@@ -29,20 +39,27 @@ curl -X POST http://localhost:3456 \
   -H "Content-Type: application/json" \
   -d '{"command":"ping","args":["Build completed successfully"]}'
 
-# Show notification with current terminal title
+# Include terminal title in notification
 curl -X POST http://localhost:3456 \
   -H "Content-Type: application/json" \
-  -d '{"command":"pingTerminalTitle","args":[]}'
+  -d "{\"command\":\"ping\",\"args\":[\"Task done in $CLAUDE_HELPER_CURRENT_TERMINAL_TITLE\"]}"
 ```
 
 ### Set Terminal Title
 
 ```bash
-# Change the title of your current terminal
+# In a Claude Helper terminal (with $CLAUDE_HELPER_CURRENT_TERMINAL_TITLE)
+curl -X POST http://localhost:3456 \
+  -H "Content-Type: application/json" \
+  -d "{\"command\":\"setTerminalTitle\",\"args\":[\"Building Project\",\"$CLAUDE_HELPER_CURRENT_TERMINAL_TITLE\"]}"
+
+# Or rename the active terminal (fallback)
 curl -X POST http://localhost:3456 \
   -H "Content-Type: application/json" \
   -d '{"command":"setTerminalTitle","args":["Building Project"]}'
 ```
+
+**Tip**: When using "Claude Helper: Open Claude Terminal", the `$CLAUDE_HELPER_CURRENT_TERMINAL_TITLE` environment variable contains the terminal's unique title, allowing precise targeting even with multiple terminals open.
 
 ### Compare Git References
 
@@ -67,25 +84,6 @@ curl -X POST http://localhost:3456 \
   -d '{"command":"clearComparisons","args":[]}'
 ```
 
-## Available Commands
-
-| Command | Arguments | Description |
-|---------|-----------|-------------|
-| `ping` | `[message]` (optional) | Show notification with timestamp and optional message |
-| `pingTerminalTitle` | none | Show notification with current terminal title |
-| `setTerminalTitle` | `title` (string) | Set current terminal title |
-| `compareReferences` | `ref1, ref2` (strings) | Compare two git references |
-| `compareHead` | `ref` (string) | Compare HEAD with a reference |
-| `clearComparisons` | none | Clear all GitLens comparisons |
-
-## Use Cases for Claude Code
-
-Claude Code can use this extension to:
-
-- **Compare branches** before merging or reviewing changes
-- **Label terminals** during long-running builds or tests
-- **Send notifications** when tasks complete
-- **Organize workflows** with clear terminal naming
 
 ## Troubleshooting
 
@@ -94,17 +92,6 @@ Claude Code can use this extension to:
 1. Ensure VS Code is open with a workspace folder
 2. Check extension is installed: `code --list-extensions | grep claude-helper`
 3. View logs in VS Code: `Ctrl+Shift+P` → `Claude Helper: Show Logs`
-
-### Connection Refused
-
-- Make sure VS Code is running with the extension activated
-- Check logs for "HTTP listener started on http://127.0.0.1:3456"
-- Ensure no other process is using port 3456
-
-### Compare Commands Not Working
-
-- Ensure GitLens extension is installed: `code --list-extensions | grep gitlens`
-- Verify you're in a git repository with valid refs
 
 ## Documentation
 

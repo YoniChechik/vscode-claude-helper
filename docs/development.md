@@ -17,40 +17,6 @@ This is a VS Code extension that:
 └── package.json               # VS Code extension config
 ```
 
-## Testing with curl
-
-The extension listens on `http://localhost:3456` when VS Code is running. Test commands directly:
-
-```bash
-# Send a notification
-curl -X POST http://localhost:3456 \
-  -H "Content-Type: application/json" \
-  -d '{"command":"ping","args":["Hello from curl!"]}'
-
-# Set terminal title
-curl -X POST http://localhost:3456 \
-  -H "Content-Type: application/json" \
-  -d '{"command":"setTerminalTitle","args":["My Terminal"]}'
-
-# Compare git references
-curl -X POST http://localhost:3456 \
-  -H "Content-Type: application/json" \
-  -d '{"command":"compareReferences","args":["main","HEAD"]}'
-
-# Clear comparisons
-curl -X POST http://localhost:3456 \
-  -H "Content-Type: application/json" \
-  -d '{"command":"clearComparisons","args":[]}'
-```
-
-Available commands:
-- `ping` - Show notification with optional message
-- `pingTerminalTitle` - Show notification with current terminal title
-- `setTerminalTitle` - Change terminal title
-- `compareReferences` - Compare two git refs
-- `compareHead` - Compare HEAD with another ref
-- `clearComparisons` - Clear GitLens comparisons
-
 ## Development Workflow
 
 ### Modifying the Extension
