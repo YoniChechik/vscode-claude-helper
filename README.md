@@ -19,7 +19,7 @@ Or install from the [VS Code Marketplace](https://marketplace.visualstudio.com/i
 
 ## Usage
 
-The extension listens on `http://localhost:3456` when VS Code is running. Send commands via HTTP POST requests:
+The extension automatically finds an available port (starting from 3456) when VS Code starts. When using "Claude Helper: Open Claude Terminal", the `$CLAUDE_HELPER_PORT` environment variable contains the port number. Send commands via HTTP POST requests:
 
 ## Available Commands
 
@@ -35,12 +35,12 @@ The extension listens on `http://localhost:3456` when VS Code is running. Send c
 
 ```bash
 # Show a notification with custom message
-curl -X POST http://localhost:3456 \
+curl -X POST http://localhost:$CLAUDE_HELPER_PORT \
   -H "Content-Type: application/json" \
   -d '{"command":"ping","args":["Build completed successfully"]}'
 
 # Include terminal title in notification
-curl -X POST http://localhost:3456 \
+curl -X POST http://localhost:$CLAUDE_HELPER_PORT \
   -H "Content-Type: application/json" \
   -d "{\"command\":\"ping\",\"args\":[\"Task done in $CLAUDE_HELPER_CURRENT_TERMINAL_TITLE\"]}"
 ```
@@ -49,28 +49,30 @@ curl -X POST http://localhost:3456 \
 
 ```bash
 # In a Claude Helper terminal (with $CLAUDE_HELPER_CURRENT_TERMINAL_TITLE)
-curl -X POST http://localhost:3456 \
+curl -X POST http://localhost:$CLAUDE_HELPER_PORT \
   -H "Content-Type: application/json" \
   -d "{\"command\":\"setTerminalTitle\",\"args\":[\"Building Project\",\"$CLAUDE_HELPER_CURRENT_TERMINAL_TITLE\"]}"
 
 # Or rename the active terminal (fallback)
-curl -X POST http://localhost:3456 \
+curl -X POST http://localhost:$CLAUDE_HELPER_PORT \
   -H "Content-Type: application/json" \
   -d '{"command":"setTerminalTitle","args":["Building Project"]}'
 ```
 
-**Tip**: When using "Claude Helper: Open Claude Terminal", the `$CLAUDE_HELPER_CURRENT_TERMINAL_TITLE` environment variable contains the terminal's unique title, allowing precise targeting even with multiple terminals open.
+**Tip**: When using "Claude Helper: Open Claude Terminal", the terminal automatically exports:
+- `$CLAUDE_HELPER_CURRENT_TERMINAL_TITLE` - The terminal's unique title for precise targeting
+- `$CLAUDE_HELPER_PORT` - The HTTP port number for sending commands
 
 ### Compare Git References
 
 ```bash
 # Compare two branches/commits
-curl -X POST http://localhost:3456 \
+curl -X POST http://localhost:$CLAUDE_HELPER_PORT \
   -H "Content-Type: application/json" \
   -d '{"command":"compareReferences","args":["main","HEAD"]}'
 
 # Compare HEAD with another ref
-curl -X POST http://localhost:3456 \
+curl -X POST http://localhost:$CLAUDE_HELPER_PORT \
   -H "Content-Type: application/json" \
   -d '{"command":"compareHead","args":["origin/main"]}'
 ```
@@ -79,7 +81,7 @@ curl -X POST http://localhost:3456 \
 
 ```bash
 # Clear all GitLens comparisons
-curl -X POST http://localhost:3456 \
+curl -X POST http://localhost:$CLAUDE_HELPER_PORT \
   -H "Content-Type: application/json" \
   -d '{"command":"clearComparisons","args":[]}'
 ```

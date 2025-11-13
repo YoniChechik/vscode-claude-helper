@@ -22,6 +22,7 @@ interface CliResult {
 let outputChannel: vscode.OutputChannel;
 let logMessages: string[] = [];
 let workspaceLogPath: string | undefined;
+let currentPort: number | undefined;
 
 function log(message: string) {
     const timestamp = new Date().toLocaleTimeString();
@@ -224,7 +225,7 @@ async function findClosestGitReference(userInput: string): Promise<string> {
 }
 
 
-export function activate(context: vscode.ExtensionContext) {
+export async function activate(context: vscode.ExtensionContext) {
     outputChannel = vscode.window.createOutputChannel('Claude Helper');
     context.subscriptions.push(outputChannel);
 
@@ -250,21 +251,8 @@ export function activate(context: vscode.ExtensionContext) {
     });
     context.subscriptions.push(showLogsCommand);
 
-    // Register command to open Claude terminal
-    const openClaudeTerminalCommand = vscode.commands.registerCommand('claude-helper.openClaudeTerminal', () => {
-        const uniqueTitle = generateUniqueTerminalTitle();
-        const terminal = vscode.window.createTerminal(uniqueTitle);
-        terminal.show();
-        // Wait for terminal to be ready, export the terminal title, then run claude
-        setTimeout(() => {
-            terminal.sendText(`export CLAUDE_HELPER_CURRENT_TERMINAL_TITLE="${uniqueTitle}"`, true);
-            terminal.sendText('claude', true);
-        }, 500);
-    });
-    context.subscriptions.push(openClaudeTerminalCommand);
-
-    // Initialize port listener
-    const portListenerPort = 3456; // Using a specific port for Claude Helper
+    // Initialize port listener FIRST before registering commands that depend on it
+    const portListenerStartPort = 3456; // Starting port for Claude Helper
     const commandHandlers = new Map<string, (args: string[]) => Promise<CliResult>>([
         ['compareReferences', executeCompareReferences],
         ['compareHead', executeCompareHead],
@@ -276,14 +264,33 @@ export function activate(context: vscode.ExtensionContext) {
     try {
         log('Attempting to initialize HTTP port listener...');
         console.log('Attempting to initialize HTTP port listener...');
-        initializePortListener(context, portListenerPort, commandHandlers);
-        log('Port listener initialization call completed');
-        console.log('Port listener initialization call completed');
+        currentPort = await initializePortListener(context, portListenerStartPort, commandHandlers);
+        log(`Port listener initialized on port ${currentPort}`);
+        console.log(`Port listener initialized on port ${currentPort}`);
+
+        // Store the port in workspace state for persistence
+        context.workspaceState.update('claudeHelperPort', currentPort);
     } catch (error) {
         log(`Failed to initialize port listener: ${error}`);
         console.error('Failed to initialize port listener:', error);
         vscode.window.showErrorMessage(`Claude Helper: Failed to start HTTP listener - ${error}`);
     }
+
+    // Register command to open Claude terminal AFTER port is initialized
+    const openClaudeTerminalCommand = vscode.commands.registerCommand('claude-helper.openClaudeTerminal', () => {
+        const uniqueTitle = generateUniqueTerminalTitle();
+        const terminal = vscode.window.createTerminal(uniqueTitle);
+        terminal.show();
+        // Wait for terminal to be ready, export environment variables, then run claude
+        setTimeout(() => {
+            terminal.sendText(`export CLAUDE_HELPER_CURRENT_TERMINAL_TITLE="${uniqueTitle}"`, true);
+            if (currentPort) {
+                terminal.sendText(`export CLAUDE_HELPER_PORT="${currentPort}"`, true);
+            }
+            terminal.sendText('claude', true);
+        }, 500);
+    });
+    context.subscriptions.push(openClaudeTerminalCommand);
 
     const commandFilePath = path.join(workspaceRoot, CLI_COMMAND_FILE);
     const resultFilePath = path.join(workspaceRoot, CLI_RESULT_FILE);

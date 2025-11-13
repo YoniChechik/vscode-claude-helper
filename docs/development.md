@@ -5,9 +5,10 @@ Quick reference for developing and testing Claude Helper.
 ## Repository Structure
 
 This is a VS Code extension that:
-- Listens on HTTP port 3456 for commands
+- Listens on an available HTTP port (starting from 3456) for commands
 - Executes VS Code/GitLens commands
 - Can be controlled via curl or HTTP requests
+- Supports multiple VS Code windows by dynamically assigning ports
 
 ```
 ├── src/
@@ -35,8 +36,8 @@ code --install-extension claude-helper-*.vsix --force
 # 4. Reload VS Code window
 # Press Ctrl+Shift+P → "Developer: Reload Window"
 
-# 5. Test with curl
-curl -X POST http://localhost:3456 \
+# 5. Test with curl (from Claude Helper terminal with $CLAUDE_HELPER_PORT set)
+curl -X POST http://localhost:$CLAUDE_HELPER_PORT \
   -H "Content-Type: application/json" \
   -d '{"command":"ping","args":["Extension updated!"]}'
 ```
@@ -62,9 +63,9 @@ cat .claude-helper.log
 
 ### Common Issues
 
-**Port 3456 already in use:**
-- Another VS Code instance is running the extension
-- Close other VS Code windows or change the port in `src/extension.ts:77`
+**Multiple VS Code windows:**
+- Each window automatically gets its own port (3456, 3457, 3458, etc.)
+- Use Claude Helper terminal to get the correct `$CLAUDE_HELPER_PORT` for that window
 
 **Extension not activating:**
 - Ensure workspace folder is open
@@ -73,7 +74,8 @@ cat .claude-helper.log
 
 **curl connection refused:**
 - VS Code must be running with the extension activated
-- Check logs for "HTTP listener started on http://127.0.0.1:3456"
+- Check logs for "HTTP listener started on http://127.0.0.1:XXXX"
+- Make sure to use `$CLAUDE_HELPER_PORT` environment variable from Claude Helper terminal
 
 ## Useful Commands
 
@@ -90,8 +92,8 @@ npx @vscode/vsce package
 # List files in package
 npx @vscode/vsce ls
 
-# Test with curl
-curl -X POST http://localhost:3456 \
+# Test with curl (use $CLAUDE_HELPER_PORT from Claude Helper terminal)
+curl -X POST http://localhost:$CLAUDE_HELPER_PORT \
   -H "Content-Type: application/json" \
   -d '{"command":"ping","args":["Test"]}'
 ```
