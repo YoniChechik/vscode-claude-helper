@@ -21,7 +21,6 @@ interface CliResult {
 // Create output channel for logging
 let outputChannel: vscode.OutputChannel;
 let logMessages: string[] = [];
-let workspaceLogPath: string | undefined;
 let currentPort: number | undefined;
 
 function log(message: string) {
@@ -29,16 +28,6 @@ function log(message: string) {
     const logLine = `[${timestamp}] ${message}`;
     outputChannel.appendLine(logLine);
     logMessages.push(logLine);
-
-    // Write to file immediately for debugging
-    if (workspaceLogPath) {
-        try {
-            const allLogs = logMessages.join('\n') + '\n';
-            fs.writeFileSync(workspaceLogPath, allLogs);
-        } catch (e) {
-            console.error('Failed to write log file:', e);
-        }
-    }
 
     // Keep only last 100 log messages
     if (logMessages.length > 100) {
@@ -236,14 +225,11 @@ export async function activate(context: vscode.ExtensionContext) {
         return;
     }
 
-    // Set up log file path
-    workspaceLogPath = path.join(workspaceRoot, '.claude-helper.log');
-
     log('Claude Helper is now active');
     console.log('Claude Helper is now active');
 
     // Show activation notification
-    vscode.window.showInformationMessage('Claude Helper activated - logs in .claude-helper.log');
+    vscode.window.showInformationMessage('Claude Helper activated - logs in Output Panel');
 
     // Register command to show logs
     const showLogsCommand = vscode.commands.registerCommand('claude-helper.showLogs', () => {
