@@ -1,87 +1,41 @@
 import * as vscode from 'vscode';
 import * as http from 'http';
 import * as net from 'net';
+import { Logger } from './utils/logger';
+import { CliResult, CommandHandler, CommandName } from './commands/registry';
+import { createErrorResult, handleCommandError } from './utils/results';
+
+const PORT_HOST = '127.0.0.1';
+const PORT_MAX_ATTEMPTS = 10;
 
 interface CliCommand {
-    command: string;
+    command: CommandName;
     args: string[];
 }
 
-interface CliResult {
-    success: boolean;
-    message: string;
-    error?: string;
-    logs?: string[];
-}
-
-type CommandHandler = (args: string[]) => Promise<CliResult>;
-
 let server: http.Server | null = null;
-let outputChannel: vscode.OutputChannel | null = null;
+let logger: Logger;
 let commandHandlers: Map<string, CommandHandler> = new Map();
 
-function log(message: string) {
-    if (outputChannel) {
-        const timestamp = new Date().toLocaleTimeString();
-        outputChannel.appendLine(`[${timestamp}] [Port Listener] ${message}`);
-    }
-    console.log(`[Port Listener] ${message}`);
-}
-
-/**
- * Try to find an available port starting from the given port number.
- * Tries up to maxAttempts consecutive ports.
- */
-async function findAvailablePort(startPort: number, maxAttempts: number = 10): Promise<number> {
-    for (let port = startPort; port < startPort + maxAttempts; port++) {
-        if (await isPortAvailable(port)) {
-            log(`Found available port: ${port}`);
-            return port;
-        }
-        log(`Port ${port} is in use, trying next...`);
-    }
-    throw new Error(`No available port found in range ${startPort}-${startPort + maxAttempts - 1}`);
-}
-
-/**
- * Check if a port is available by trying to create a server on it
- */
-function isPortAvailable(port: number): Promise<boolean> {
-    return new Promise((resolve) => {
-        const testServer = net.createServer();
-
-        testServer.once('error', (err: NodeJS.ErrnoException) => {
-            if (err.code === 'EADDRINUSE') {
-                resolve(false);
-            } else {
-                // Other errors mean we can't use this port either
-                resolve(false);
-            }
-        });
-
-        testServer.once('listening', () => {
-            testServer.close();
-            resolve(true);
-        });
-
-        testServer.listen(port, '127.0.0.1');
-    });
-}
+// ============================================================================
+// Public API
+// ============================================================================
 
 export async function initializePortListener(
     context: vscode.ExtensionContext,
     startPort: number,
-    handlers: Map<string, CommandHandler>
+    handlers: Map<string, CommandHandler>,
+    sharedLogger: Logger
 ): Promise<number> {
     console.log('[Port Listener] initializePortListener called with start port:', startPort);
     console.log('[Port Listener] Handlers count:', handlers.size);
-    outputChannel = vscode.window.createOutputChannel('Claude Helper Port Listener');
-    context.subscriptions.push(outputChannel);
+
+    logger = sharedLogger;
     commandHandlers = handlers;
 
     // Find an available port
     const port = await findAvailablePort(startPort);
-    log(`Initializing HTTP listener on port ${port}...`);
+    logger.log(`Initializing HTTP listener on port ${port}...`);
 
     // Create HTTP server
     server = http.createServer(async (req, res) => {
@@ -108,7 +62,7 @@ export async function initializePortListener(
             return;
         }
 
-        log(`Request from ${req.socket.remoteAddress}`);
+        logger.log(`Request from ${req.socket.remoteAddress}`);
 
         // Read request body
         let body = '';
@@ -119,36 +73,32 @@ export async function initializePortListener(
         req.on('end', async () => {
             try {
                 const command: CliCommand = JSON.parse(body);
-                log(`Received command: ${command.command} with args: ${JSON.stringify(command.args)}`);
+                logger.log(`Received command: ${command.command} with args: ${JSON.stringify(command.args)}`);
 
                 const result = await processCommand(command);
 
                 res.writeHead(200);
                 res.end(JSON.stringify(result, null, 2));
-                log(`Sent response: ${result.success ? 'success' : 'failure'}`);
+                logger.log(`Sent response: ${result.success ? 'success' : 'failure'}`);
 
             } catch (error) {
-                const errorResult: CliResult = {
-                    success: false,
-                    message: '',
-                    error: error instanceof Error ? error.message : String(error)
-                };
+                const errorResult = handleCommandError(error);
                 res.writeHead(400);
                 res.end(JSON.stringify(errorResult, null, 2));
-                log(`Error processing request: ${errorResult.error}`);
+                logger.log(`Error processing request: ${errorResult.error}`);
             }
         });
     });
 
     return new Promise<number>((resolve, reject) => {
         server!.on('error', (error: NodeJS.ErrnoException) => {
-            log(`Server error: ${error.message}`);
+            logger.log(`Server error: ${error.message}`);
             vscode.window.showErrorMessage(`Claude Helper: Port listener error - ${error.message}`);
             reject(error);
         });
 
-        server!.listen(port, '127.0.0.1', () => {
-            log(`HTTP listener started on http://127.0.0.1:${port}`);
+        server!.listen(port, PORT_HOST, () => {
+            logger.log(`HTTP listener started on http://${PORT_HOST}:${port}`);
             vscode.window.showInformationMessage(`Claude Helper: HTTP listener active on port ${port}`);
             resolve(port);
         });
@@ -157,10 +107,55 @@ export async function initializePortListener(
             dispose: () => {
                 if (server) {
                     server.close();
-                    log('HTTP listener stopped');
+                    logger.log('HTTP listener stopped');
                 }
             }
         });
+    });
+}
+
+export function stopPortListener(): void {
+    if (server) {
+        server.close();
+        server = null;
+        logger.log('HTTP listener stopped');
+    }
+}
+
+// ============================================================================
+// Private Helpers
+// ============================================================================
+
+async function findAvailablePort(startPort: number, maxAttempts: number = PORT_MAX_ATTEMPTS): Promise<number> {
+    for (let port = startPort; port < startPort + maxAttempts; port++) {
+        if (await isPortAvailable(port)) {
+            logger.log(`Found available port: ${port}`);
+            return port;
+        }
+        logger.log(`Port ${port} is in use, trying next...`);
+    }
+    throw new Error(`No available port found in range ${startPort}-${startPort + maxAttempts - 1}`);
+}
+
+function isPortAvailable(port: number): Promise<boolean> {
+    return new Promise((resolve) => {
+        const testServer = net.createServer();
+
+        testServer.once('error', (err: NodeJS.ErrnoException) => {
+            if (err.code === 'EADDRINUSE') {
+                resolve(false);
+            } else {
+                // Other errors mean we can't use this port either
+                resolve(false);
+            }
+        });
+
+        testServer.once('listening', () => {
+            testServer.close();
+            resolve(true);
+        });
+
+        testServer.listen(port, PORT_HOST);
     });
 }
 
@@ -168,28 +163,12 @@ async function processCommand(command: CliCommand): Promise<CliResult> {
     const handler = commandHandlers.get(command.command);
 
     if (!handler) {
-        return {
-            success: false,
-            message: '',
-            error: `Unknown command: ${command.command}`
-        };
+        return createErrorResult(`Unknown command: ${command.command}`);
     }
 
     try {
-        return await handler(command.args);
+        return await handler(command.args, logger.log.bind(logger));
     } catch (error) {
-        return {
-            success: false,
-            message: '',
-            error: error instanceof Error ? error.message : String(error)
-        };
-    }
-}
-
-export function stopPortListener(): void {
-    if (server) {
-        server.close();
-        server = null;
-        log('HTTP listener stopped');
+        return handleCommandError(error);
     }
 }

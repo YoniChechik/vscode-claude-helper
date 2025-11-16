@@ -27,9 +27,7 @@ The extension automatically finds an available port (starting from 3456) when VS
 |---------|-----------|-------------|
 | `ping` | `[message]` (optional) | Show notification with timestamp and optional message (can include `$CLAUDE_HELPER_CURRENT_TERMINAL_TITLE`) |
 | `setTerminalTitle` | `new_title, [current_title]` | Rename terminal (with optional targeting) |
-| `compareReferences` | `ref1, ref2` (strings) | Compare two git references |
-| `compareHead` | `ref` (string) | Compare HEAD with a reference |
-| `clearComparisons` | none | Clear all GitLens comparisons |
+| `compareReferences` | `ref1, ref2, [submodule_path]` | Compare git refs or working tree in main repo or submodule (auto-clears previous comparisons) |
 
 ### Send Notifications
 
@@ -65,8 +63,10 @@ curl -X POST http://localhost:$CLAUDE_HELPER_PORT \
 
 ### Compare Git References
 
+Opens GitLens Search & Compare view. Automatically clears previous comparisons.
+
 ```bash
-# Compare two branches/commits
+# Compare two branches/commits in main repository
 curl -X POST http://localhost:$CLAUDE_HELPER_PORT \
   -H "Content-Type: application/json" \
   -d '{"command":"compareReferences","args":["main","HEAD"]}'
@@ -74,16 +74,22 @@ curl -X POST http://localhost:$CLAUDE_HELPER_PORT \
 # Compare HEAD with another ref
 curl -X POST http://localhost:$CLAUDE_HELPER_PORT \
   -H "Content-Type: application/json" \
-  -d '{"command":"compareHead","args":["origin/main"]}'
-```
+  -d '{"command":"compareReferences","args":["HEAD","origin/main"]}'
 
-### Clear Comparisons
-
-```bash
-# Clear all GitLens comparisons
+# Compare working tree with a ref (use empty string for ref2)
 curl -X POST http://localhost:$CLAUDE_HELPER_PORT \
   -H "Content-Type: application/json" \
-  -d '{"command":"clearComparisons","args":[]}'
+  -d '{"command":"compareReferences","args":["HEAD~3",""]}'
+
+# Compare in a submodule (add submodule path as 3rd argument)
+curl -X POST http://localhost:$CLAUDE_HELPER_PORT \
+  -H "Content-Type: application/json" \
+  -d '{"command":"compareReferences","args":["HEAD~2","HEAD",".claude"]}'
+
+# Compare working tree in submodule
+curl -X POST http://localhost:$CLAUDE_HELPER_PORT \
+  -H "Content-Type: application/json" \
+  -d '{"command":"compareReferences","args":["HEAD","",".claude"]}'
 ```
 
 
