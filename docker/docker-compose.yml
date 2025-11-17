@@ -24,7 +24,7 @@ x-build: &build
   dockerfile: docker/Dockerfile
 
 services:
-  dev-vscode-claude-helper:
+  vscode-claude-helper-dev:
     <<: *default
     build:
       <<: *build
@@ -34,5 +34,6 @@ services:
       - "/home/yoni/vscode-claude-helper:/root/vscode-claude-helper" # mount main repository (contains worktrees inside)
       - "/home/yoni/.vscode-server:/root/.vscode-server" # vscode remote settings
       - "/home/yoni/.cursor-server:/root/.cursor-server" # cursor remote settings
-      - "/home/yoni/.claude:/home/node/.claude" # claude settings
+      - "/home/yoni/.claude:/root/.claude" # claude settings
       - "/home/yoni/.config/gh:/root/.config/gh" # github cli settings
+      - "/usr/local/bin/code:/usr/local/bin/code" # vscode cli

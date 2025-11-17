@@ -25,3 +25,6 @@ echo "Latest container ID: $LATEST_CONTAINER"
 echo "Container name: $CONTAINER_NAME"
 echo "Starting latest container: $LATEST_CONTAINER"
 docker start "$LATEST_CONTAINER"
+
+echo "Connecting to container..."
+docker exec -it $LATEST_CONTAINER zsh

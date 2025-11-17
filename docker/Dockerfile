@@ -50,18 +50,19 @@ RUN --mount=target=/var/lib/apt/lists,type=cache,sharing=locked \
 
 # ==== claude
 # set claude config dir to a mountable location
-ENV CLAUDE_CONFIG_DIR=/home/node/.claude
+# ENV CLAUDE_CONFIG_DIR=/home/node/.claude
 # add sandbox mode so claude can run dangerously
 # https://github.com/anthropics/claude-code/issues/3490
 ENV IS_SANDBOX=1
-# Install Node.js and npm for Claude Code CLI
+# Install Claude Code CLI
 RUN --mount=target=/var/lib/apt/lists,type=cache,sharing=locked \
     --mount=target=/var/cache/apt,type=cache,sharing=locked \
     apt-get update && \
     apt-get install -y curl && \
-    curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && \
-    apt-get install -y nodejs && \
-    npm install -g @anthropic-ai/claude-code
+    curl -fsSL https://claude.ai/install.sh | bash
+# add claude to path
+ENV PATH="/root/.claude/bin:/root/.local/bin:${PATH}"
+
 
 # ==== uv
 RUN --mount=type=bind,source=.,target=/root/vscode-claude-helper,rw \
@@ -81,6 +82,16 @@ RUN (type -p wget >/dev/null || (apt-get update && apt-get install wget -y)) \
 	&& echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | tee /etc/apt/sources.list.d/github-cli.list > /dev/null \
 	&& apt-get update \
 	&& apt-get install gh -y
+
+# ==== aws cli
+RUN --mount=target=/var/lib/apt/lists,type=cache,sharing=locked \
+    --mount=target=/var/cache/apt,type=cache,sharing=locked \
+    apt-get update && \
+    apt-get install -y unzip curl && \
+    curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip" && \
+    unzip -q awscliv2.zip && \
+    ./aws/install && \
+    rm -rf aws awscliv2.zip
 
 # ==== git safe directories
 # Mark repo directory as safe to avoid git ownership warnings

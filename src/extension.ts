@@ -4,7 +4,7 @@ import * as path from 'path';
 import { initializePortListener } from './portListener';
 import { Logger } from './utils/logger';
 import { createCommandHandlersMap, CliResult, CommandName } from './commands/registry';
-import { generateUniqueTerminalTitle, createClaudeTerminal } from './utils/terminal';
+import { generateUniqueTerminalTitle, createClaudeTerminal, unregisterTerminalByInstance } from './utils/terminal';
 import { handleCommandError } from './utils/results';
 
 const CLI_COMMAND_FILE = '.claude-helper';
@@ -73,6 +73,13 @@ export async function activate(context: vscode.ExtensionContext) {
         await createClaudeTerminal(uniqueTitle, currentPort);
     });
     context.subscriptions.push(openClaudeTerminalCommand);
+
+    // Register terminal close handler to clean up registry
+    const terminalCloseDisposable = vscode.window.onDidCloseTerminal((terminal) => {
+        logger.log(`Terminal closed: ${terminal.name}`);
+        unregisterTerminalByInstance(terminal);
+    });
+    context.subscriptions.push(terminalCloseDisposable);
 
     const commandFilePath = path.join(workspaceRoot, CLI_COMMAND_FILE);
     const resultFilePath = path.join(workspaceRoot, CLI_RESULT_FILE);

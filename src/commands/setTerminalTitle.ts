@@ -1,55 +1,32 @@
 import * as vscode from 'vscode';
 import { CliResult } from './registry';
 import { createSuccessResult, createErrorResult, handleCommandError } from '../utils/results';
-import { findTerminalByTitle } from '../utils/terminal';
+import { findTerminalByUuid } from '../utils/terminal';
 
 export async function executeSetTerminalTitle(
     args: string[],
     logger?: (msg: string) => void
 ): Promise<CliResult> {
     try {
-        if (args.length < 1) {
-            return createErrorResult('setTerminalTitle requires at least 1 argument: <new_title> [current_title]');
+        if (args.length < 2) {
+            return createErrorResult('setTerminalTitle requires 2 arguments: <new_title> <terminal_id>');
         }
 
         const newTitle = args[0];
-        const currentTitle = args.length > 1 ? args[1] : '';
-        let targetTerminal: vscode.Terminal | undefined;
-        let oldTitle = '';
+        const terminalId = args[1];
 
-        // If currentTitle is provided and not empty, search by title
-        if (currentTitle) {
-            logger?.(`Searching for terminal with title: ${currentTitle}`);
-            logger?.(`Will rename to: ${newTitle}`);
+        logger?.(`Searching for terminal with ID: ${terminalId}`);
+        logger?.(`Will rename to: ${newTitle}`);
 
-            targetTerminal = findTerminalByTitle(currentTitle);
+        const targetTerminal = findTerminalByUuid(terminalId);
 
-            if (!targetTerminal) {
-                logger?.(`Terminal with title "${currentTitle}" not found, falling back to active terminal`);
-                targetTerminal = vscode.window.activeTerminal;
-
-                if (!targetTerminal) {
-                    return createErrorResult('Terminal not found and no active terminal available');
-                }
-
-                logger?.(`Using active terminal as fallback: ${targetTerminal.name}`);
-            }
-
-            oldTitle = targetTerminal.name;
-        } else {
-            // No currentTitle provided, use active terminal
-            logger?.(`No current title provided, using active terminal`);
-            logger?.(`Will rename to: ${newTitle}`);
-
-            targetTerminal = vscode.window.activeTerminal;
-
-            if (!targetTerminal) {
-                return createErrorResult('No active terminal found');
-            }
-
-            oldTitle = targetTerminal.name;
-            logger?.(`Active terminal: ${oldTitle}`);
+        if (!targetTerminal) {
+            return createErrorResult(`Terminal with ID "${terminalId}" not found`);
         }
+
+        logger?.(`Found terminal by ID: ${terminalId}`);
+
+        const oldTitle = targetTerminal.name;
 
         // Show the terminal first to make it active, then rename
         targetTerminal.show();
