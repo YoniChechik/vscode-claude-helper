@@ -4,23 +4,23 @@ import { exec } from 'child_process';
 import { promisify } from 'util';
 import { Logger } from './utils/logger';
 
-const execAsync = promisify(exec);
+const _execAsync = promisify(exec);
 
-type FileStatus = 'added' | 'deleted' | 'modified' | 'renamed';
+type _FileStatus = 'added' | 'deleted' | 'modified' | 'renamed';
 
-interface GitChange {
-    status: FileStatus;
+interface _GitChange {
+    status: _FileStatus;
     path: string;
     oldPath?: string;
 }
 
-interface TreeNode {
+interface _TreeNode {
     name: string;
     fullPath: string;
     isDirectory: boolean;
-    status?: FileStatus;
+    status?: _FileStatus;
     oldPath?: string;
-    children: Map<string, TreeNode>;
+    children: Map<string, _TreeNode>;
 }
 
 export class GitChangeItem extends vscode.TreeItem {
@@ -28,28 +28,28 @@ export class GitChangeItem extends vscode.TreeItem {
         public readonly label: string,
         public readonly collapsibleState: vscode.TreeItemCollapsibleState,
         public readonly resourceUri?: vscode.Uri,
-        public readonly status?: FileStatus,
+        public readonly status?: _FileStatus,
         public readonly oldPath?: string,
         public readonly isDirectory: boolean = false
     ) {
         super(label, collapsibleState);
 
         if (!isDirectory && status && resourceUri) {
-            this.iconPath = this.getStatusIcon(status);
+            this.iconPath = this._getStatusIcon(status);
             this.contextValue = 'gitChangeFile';
             this.command = {
                 command: 'git-changes.openDiff',
                 title: 'Open Diff',
                 arguments: [this]
             };
-            this.tooltip = this.getTooltip(status, oldPath);
+            this.tooltip = this._getTooltip(status, oldPath);
         } else if (isDirectory) {
             this.contextValue = 'gitChangeDirectory';
             this.iconPath = new vscode.ThemeIcon('folder');
         }
     }
 
-    private getStatusIcon(status: FileStatus): vscode.ThemeIcon {
+    private _getStatusIcon(status: _FileStatus): vscode.ThemeIcon {
         switch (status) {
             case 'added':
                 return new vscode.ThemeIcon('diff-added', new vscode.ThemeColor('gitDecoration.addedResourceForeground'));
@@ -62,7 +62,7 @@ export class GitChangeItem extends vscode.TreeItem {
         }
     }
 
-    private getTooltip(status: FileStatus, oldPath?: string): string {
+    private _getTooltip(status: _FileStatus, oldPath?: string): string {
         if (status === 'renamed' && oldPath) {
             return `Renamed from ${oldPath}`;
         }
@@ -74,7 +74,7 @@ export class GitChangesTreeProvider implements vscode.TreeDataProvider<GitChange
     private _onDidChangeTreeData = new vscode.EventEmitter<GitChangeItem | undefined>();
     readonly onDidChangeTreeData = this._onDidChangeTreeData.event;
 
-    private treeRoot: TreeNode | null = null;
+    private treeRoot: _TreeNode | null = null;
 
     constructor(
         private workspaceRoot: string,
@@ -92,18 +92,18 @@ export class GitChangesTreeProvider implements vscode.TreeDataProvider<GitChange
 
     async getChildren(element?: GitChangeItem): Promise<GitChangeItem[]> {
         if (!this.treeRoot) {
-            await this.buildTree();
+            await this._buildTree();
         }
 
         if (!element) {
-            return this.getChildItems(this.treeRoot!);
+            return this._getChildItems(this.treeRoot!);
         }
 
-        const node = this.findNode(this.treeRoot!, element.resourceUri!.fsPath);
-        return this.getChildItems(node!);
+        const node = this._findNode(this.treeRoot!, element.resourceUri!.fsPath);
+        return this._getChildItems(node!);
     }
 
-    private getChildItems(node: TreeNode): GitChangeItem[] {
+    private _getChildItems(node: _TreeNode): GitChangeItem[] {
         const items: GitChangeItem[] = [];
 
         const sortedChildren = Array.from(node.children.values()).sort((a, b) => {
@@ -133,13 +133,13 @@ export class GitChangesTreeProvider implements vscode.TreeDataProvider<GitChange
         return items;
     }
 
-    private findNode(root: TreeNode, targetPath: string): TreeNode | null {
+    private _findNode(root: _TreeNode, targetPath: string): _TreeNode | null {
         if (root.fullPath === targetPath) {
             return root;
         }
 
         for (const child of root.children.values()) {
-            const found = this.findNode(child, targetPath);
+            const found = this._findNode(child, targetPath);
             if (found) {
                 return found;
             }
@@ -148,8 +148,8 @@ export class GitChangesTreeProvider implements vscode.TreeDataProvider<GitChange
         return null;
     }
 
-    private async buildTree(): Promise<void> {
-        const changes = await this.getGitChanges();
+    private async _buildTree(): Promise<void> {
+        const changes = await this._getGitChanges();
 
         this.treeRoot = {
             name: '',
@@ -159,11 +159,11 @@ export class GitChangesTreeProvider implements vscode.TreeDataProvider<GitChange
         };
 
         for (const change of changes) {
-            this.addToTree(change);
+            this._addToTree(change);
         }
     }
 
-    private addToTree(change: GitChange): void {
+    private _addToTree(change: _GitChange): void {
         const parts = change.path.split('/');
         let currentNode = this.treeRoot!;
 
@@ -187,20 +187,20 @@ export class GitChangesTreeProvider implements vscode.TreeDataProvider<GitChange
         }
     }
 
-    private async getGitChanges(): Promise<GitChange[]> {
-        const { stdout } = await execAsync(
+    private async _getGitChanges(): Promise<_GitChange[]> {
+        const { stdout } = await _execAsync(
             'git diff --name-status origin/main',
             { cwd: this.workspaceRoot }
         );
 
-        const changes: GitChange[] = [];
+        const changes: _GitChange[] = [];
 
         for (const line of stdout.trim().split('\n')) {
             if (!line) {
                 continue;
             }
 
-            const parsed = this.parseGitStatusLine(line);
+            const parsed = this._parseGitStatusLine(line);
             if (parsed) {
                 changes.push(parsed);
             }
@@ -210,7 +210,7 @@ export class GitChangesTreeProvider implements vscode.TreeDataProvider<GitChange
         return changes;
     }
 
-    private parseGitStatusLine(line: string): GitChange | null {
+    private _parseGitStatusLine(line: string): _GitChange | null {
         const parts = line.split('\t');
         if (parts.length < 2) {
             return null;
@@ -229,7 +229,7 @@ export class GitChangesTreeProvider implements vscode.TreeDataProvider<GitChange
             };
         }
 
-        let status: FileStatus;
+        let status: _FileStatus;
         switch (statusCode) {
             case 'A':
                 status = 'added';

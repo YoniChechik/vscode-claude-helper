@@ -48,7 +48,7 @@ export async function activate(context: vscode.ExtensionContext) {
 
     context.subscriptions.push(
         vscode.commands.registerCommand('git-changes.openDiff', async (item: GitChangeItem) => {
-            await openDiff(item, workspaceRoot);
+            await _openDiff(item, workspaceRoot);
         })
     );
 
@@ -58,7 +58,7 @@ export async function activate(context: vscode.ExtensionContext) {
     treeProvider.refresh();
 }
 
-async function openDiff(item: GitChangeItem, workspaceRoot: string): Promise<void> {
+async function _openDiff(item: GitChangeItem, workspaceRoot: string): Promise<void> {
     if (!item.resourceUri) {
         return;
     }

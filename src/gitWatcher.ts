@@ -25,24 +25,24 @@ export class GitWatcher {
 
         for (const pattern of patterns) {
             const watcher = vscode.workspace.createFileSystemWatcher(pattern);
-            watcher.onDidChange(() => this.debouncedRefresh());
-            watcher.onDidCreate(() => this.debouncedRefresh());
-            watcher.onDidDelete(() => this.debouncedRefresh());
+            watcher.onDidChange(() => this._debouncedRefresh());
+            watcher.onDidCreate(() => this._debouncedRefresh());
+            watcher.onDidDelete(() => this._debouncedRefresh());
             disposables.push(watcher);
         }
 
         const workspaceWatcher = vscode.workspace.createFileSystemWatcher(
             new vscode.RelativePattern(this.workspaceRoot, '**/*')
         );
-        workspaceWatcher.onDidChange(() => this.debouncedRefresh());
-        workspaceWatcher.onDidCreate(() => this.debouncedRefresh());
-        workspaceWatcher.onDidDelete(() => this.debouncedRefresh());
+        workspaceWatcher.onDidChange(() => this._debouncedRefresh());
+        workspaceWatcher.onDidCreate(() => this._debouncedRefresh());
+        workspaceWatcher.onDidDelete(() => this._debouncedRefresh());
         disposables.push(workspaceWatcher);
 
         return disposables;
     }
 
-    private debouncedRefresh(): void {
+    private _debouncedRefresh(): void {
         if (this.debounceTimer) {
             clearTimeout(this.debounceTimer);
         }
