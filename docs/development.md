@@ -1,21 +1,21 @@
 # Development Guide
 
-Quick reference for developing and testing Claude Helper.
+Quick reference for developing and testing Git Changes extension.
 
 ## Repository Structure
 
-This is a VS Code extension that:
-- Listens on an available HTTP port (starting from 3456) for commands
-- Executes VS Code/GitLens commands
-- Can be controlled via curl or HTTP requests
-- Supports multiple VS Code windows by dynamically assigning ports
+This is a VS Code extension that provides a tree view showing git changes compared to origin/main.
 
 ```
 ├── src/
-│   ├── extension.ts           # Main extension logic
-│   └── portListener.ts        # HTTP server for commands
-├── out/                       # Compiled TypeScript output
-└── package.json               # VS Code extension config
+│   ├── extension.ts              # Main extension entry point
+│   ├── gitChangesTreeProvider.ts # Tree view data provider
+│   ├── gitContentProvider.ts     # Provides git file content for diffs
+│   ├── gitWatcher.ts             # Watches for git/file changes
+│   └── utils/
+│       └── logger.ts             # Logging utility
+├── out/                          # Compiled TypeScript output
+└── package.json                  # VS Code extension config
 ```
 
 ## Development Workflow
@@ -31,21 +31,16 @@ npm run compile
 npx @vscode/vsce package
 
 # 3. Install extension
-code --install-extension claude-helper-*.vsix --force
+code --install-extension git-changes-*.vsix --force
 
 # 4. Reload VS Code window
-# Press Ctrl+Shift+P → "Developer: Reload Window"
-
-# 5. Test with curl (from Claude Helper terminal with $CLAUDE_HELPER_PORT set)
-curl -X POST http://localhost:$CLAUDE_HELPER_PORT \
-  -H "Content-Type: application/json" \
-  -d '{"command":"ping","args":["Extension updated!"]}'
+# Press Ctrl+Shift+P -> "Developer: Reload Window"
 ```
 
 **Quick compile & reload:**
 ```bash
-npm run compile && npx @vscode/vsce package && code --install-extension claude-helper-*.vsix --force
-# Then reload VS Code window (Ctrl+Shift+P → Reload Window)
+npm run compile && npx @vscode/vsce package && code --install-extension git-changes-*.vsix --force
+# Then reload VS Code window (Ctrl+Shift+P -> Reload Window)
 ```
 
 ## Debugging
@@ -53,29 +48,19 @@ npm run compile && npx @vscode/vsce package && code --install-extension claude-h
 ### View Extension Logs
 
 **In VS Code:**
-- Press `Ctrl+Shift+P` → `Claude Helper: Show Logs`
-- Or: `Ctrl+Shift+U` → Select "Claude Helper" from dropdown
-
-**Check log file:**
-```bash
-cat .claude-helper.log
-```
+- Press `Ctrl+Shift+P` -> `Git Changes: Show Logs`
+- Or: `Ctrl+Shift+U` -> Select "Git Changes" from dropdown
 
 ### Common Issues
 
-**Multiple VS Code windows:**
-- Each window automatically gets its own port (3456, 3457, 3458, etc.)
-- Use Claude Helper terminal to get the correct `$CLAUDE_HELPER_PORT` for that window
-
 **Extension not activating:**
 - Ensure workspace folder is open
-- Check GitLens extension is installed
-- Look at Developer Tools: `Help` → `Toggle Developer Tools`
+- Ensure the workspace is a git repository with an origin/main branch
+- Look at Developer Tools: `Help` -> `Toggle Developer Tools`
 
-**curl connection refused:**
-- VS Code must be running with the extension activated
-- Check logs for "HTTP listener started on http://127.0.0.1:XXXX"
-- Make sure to use `$CLAUDE_HELPER_PORT` environment variable from Claude Helper terminal
+**Tree view not showing changes:**
+- Check that origin/main branch exists
+- Run `git fetch origin` to ensure remote refs are up to date
 
 ## Useful Commands
 
@@ -91,11 +76,6 @@ npx @vscode/vsce package
 
 # List files in package
 npx @vscode/vsce ls
-
-# Test with curl (use $CLAUDE_HELPER_PORT from Claude Helper terminal)
-curl -X POST http://localhost:$CLAUDE_HELPER_PORT \
-  -H "Content-Type: application/json" \
-  -d '{"command":"ping","args":["Test"]}'
 ```
 
 ## Publishing

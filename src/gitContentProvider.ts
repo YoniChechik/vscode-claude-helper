@@ -1,8 +1,8 @@
 import * as vscode from 'vscode';
-import { exec } from 'child_process';
+import { execFile } from 'child_process';
 import { promisify } from 'util';
 
-const execAsync = promisify(exec);
+const execFileAsync = promisify(execFile);
 
 export class GitContentProvider implements vscode.TextDocumentContentProvider {
     constructor(private workspaceRoot: string) {}
@@ -14,8 +14,9 @@ export class GitContentProvider implements vscode.TextDocumentContentProvider {
             throw new Error('Missing ref parameter in URI query');
         }
 
-        const { stdout } = await execAsync(
-            `git show "${ref}:${filePath}"`,
+        const { stdout } = await execFileAsync(
+            'git',
+            ['show', `${ref}:${filePath}`],
             { cwd: this.workspaceRoot, maxBuffer: 10 * 1024 * 1024 }
         );
         return stdout;

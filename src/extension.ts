@@ -53,7 +53,8 @@ export async function activate(context: vscode.ExtensionContext) {
     );
 
     const gitWatcher = new GitWatcher(workspaceRoot, () => treeProvider.refresh());
-    context.subscriptions.push(...gitWatcher.start());
+    gitWatcher.start();
+    context.subscriptions.push(gitWatcher);
 
     treeProvider.refresh();
 }
