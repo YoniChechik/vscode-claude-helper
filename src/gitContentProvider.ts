@@ -9,7 +9,10 @@ export class GitContentProvider implements vscode.TextDocumentContentProvider {
 
     async provideTextDocumentContent(uri: vscode.Uri): Promise<string> {
         const filePath = uri.path;
-        const ref = new URLSearchParams(uri.query).get('ref')!;
+        const ref = new URLSearchParams(uri.query).get('ref');
+        if (!ref) {
+            throw new Error('Missing ref parameter in URI query');
+        }
 
         const { stdout } = await execAsync(
             `git show "${ref}:${filePath}"`,

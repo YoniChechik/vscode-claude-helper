@@ -102,4 +102,6 @@ async function _openDiff(item: GitChangeItem, workspaceRoot: string): Promise<vo
     }
 }
 
-export function deactivate(): void {}
+export function deactivate(): void {
+    // Extension cleanup handled by VS Code via subscriptions
+}

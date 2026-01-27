@@ -95,12 +95,23 @@ export class GitChangesTreeProvider implements vscode.TreeDataProvider<GitChange
             await this._buildTree();
         }
 
-        if (!element) {
-            return this._getChildItems(this.treeRoot!);
+        if (!this.treeRoot) {
+            return [];
         }
 
-        const node = this._findNode(this.treeRoot!, element.resourceUri!.fsPath);
-        return this._getChildItems(node!);
+        if (!element) {
+            return this._getChildItems(this.treeRoot);
+        }
+
+        if (!element.resourceUri) {
+            return [];
+        }
+
+        const node = this._findNode(this.treeRoot, element.resourceUri.fsPath);
+        if (!node) {
+            return [];
+        }
+        return this._getChildItems(node);
     }
 
     private _getChildItems(node: _TreeNode): GitChangeItem[] {
@@ -164,8 +175,11 @@ export class GitChangesTreeProvider implements vscode.TreeDataProvider<GitChange
     }
 
     private _addToTree(change: _GitChange): void {
+        if (!this.treeRoot) {
+            return;
+        }
         const parts = change.path.split('/');
-        let currentNode = this.treeRoot!;
+        let currentNode = this.treeRoot;
 
         for (let i = 0; i < parts.length; i++) {
             const part = parts[i];
@@ -183,7 +197,11 @@ export class GitChangesTreeProvider implements vscode.TreeDataProvider<GitChange
                 });
             }
 
-            currentNode = currentNode.children.get(part)!;
+            const nextNode = currentNode.children.get(part);
+            if (!nextNode) {
+                return;
+            }
+            currentNode = nextNode;
         }
     }
 
