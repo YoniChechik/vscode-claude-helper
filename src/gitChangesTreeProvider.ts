@@ -91,28 +91,16 @@ export class GitChangesTreeProvider implements vscode.TreeDataProvider<GitChange
     }
 
     async getChildren(element?: GitChangeItem): Promise<GitChangeItem[]> {
-        if (!this.workspaceRoot) {
-            return [];
-        }
-
         if (!this.treeRoot) {
             await this.buildTree();
         }
 
-        if (!this.treeRoot) {
-            return [];
-        }
-
         if (!element) {
-            return this.getChildItems(this.treeRoot);
+            return this.getChildItems(this.treeRoot!);
         }
 
-        const node = this.findNode(this.treeRoot, element.resourceUri?.fsPath || '');
-        if (!node) {
-            return [];
-        }
-
-        return this.getChildItems(node);
+        const node = this.findNode(this.treeRoot!, element.resourceUri!.fsPath);
+        return this.getChildItems(node!);
     }
 
     private getChildItems(node: TreeNode): GitChangeItem[] {
@@ -176,12 +164,8 @@ export class GitChangesTreeProvider implements vscode.TreeDataProvider<GitChange
     }
 
     private addToTree(change: GitChange): void {
-        if (!this.treeRoot) {
-            return;
-        }
-
         const parts = change.path.split('/');
-        let currentNode = this.treeRoot;
+        let currentNode = this.treeRoot!;
 
         for (let i = 0; i < parts.length; i++) {
             const part = parts[i];
@@ -199,39 +183,31 @@ export class GitChangesTreeProvider implements vscode.TreeDataProvider<GitChange
                 });
             }
 
-            const nextNode = currentNode.children.get(part);
-            if (nextNode) {
-                currentNode = nextNode;
-            }
+            currentNode = currentNode.children.get(part)!;
         }
     }
 
     private async getGitChanges(): Promise<GitChange[]> {
-        try {
-            const { stdout } = await execAsync(
-                'git diff --name-status origin/main',
-                { cwd: this.workspaceRoot }
-            );
+        const { stdout } = await execAsync(
+            'git diff --name-status origin/main',
+            { cwd: this.workspaceRoot }
+        );
 
-            const changes: GitChange[] = [];
+        const changes: GitChange[] = [];
 
-            for (const line of stdout.trim().split('\n')) {
-                if (!line) {
-                    continue;
-                }
-
-                const parsed = this.parseGitStatusLine(line);
-                if (parsed) {
-                    changes.push(parsed);
-                }
+        for (const line of stdout.trim().split('\n')) {
+            if (!line) {
+                continue;
             }
 
-            this.logger.log(`Found ${changes.length} changed files`);
-            return changes;
-        } catch (error) {
-            this.logger.log(`Error getting git changes: ${error}`);
-            return [];
+            const parsed = this.parseGitStatusLine(line);
+            if (parsed) {
+                changes.push(parsed);
+            }
         }
+
+        this.logger.log(`Found ${changes.length} changed files`);
+        return changes;
     }
 
     private parseGitStatusLine(line: string): GitChange | null {

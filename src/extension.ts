@@ -102,6 +102,4 @@ async function openDiff(item: GitChangeItem, workspaceRoot: string): Promise<voi
     }
 }
 
-export function deactivate(): void {
-    // Nothing to clean up
-}
+export function deactivate(): void {}
