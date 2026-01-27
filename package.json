@@ -1,8 +1,8 @@
 {
-  "name": "claude-helper",
-  "displayName": "Claude Helper",
-  "description": "CLI tools for Claude Code - compare git refs, set terminal titles, notifications (VS Code Extension - CLI tool: uv tool install claude-helper)",
-  "version": "1.2.0",
+  "name": "git-changes-view",
+  "displayName": "Git Changes View",
+  "description": "Live-updating tree view of changed files compared to origin/main",
+  "version": "2.0.0",
   "publisher": "YoniChechik",
   "author": {
     "name": "Yoni Chechik"
@@ -17,12 +17,10 @@
   },
   "homepage": "https://github.com/YoniChechik/vscode-claude-helper#readme",
   "keywords": [
-    "claude",
-    "cli",
     "git",
-    "compare",
-    "terminal",
-    "helper"
+    "diff",
+    "changes",
+    "tree"
   ],
   "engines": {
     "vscode": "^1.75.0"
@@ -35,20 +33,51 @@
   ],
   "main": "./out/extension.js",
   "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "gitChanges",
+          "title": "Git Changes",
+          "icon": "$(git-compare)"
+        }
+      ]
+    },
+    "views": {
+      "gitChanges": [
+        {
+          "id": "gitChangesView",
+          "name": "Changes vs origin/main",
+          "icon": "$(git-compare)",
+          "contextualTitle": "Git Changes"
+        }
+      ]
+    },
     "commands": [
       {
-        "command": "claude-helper.showLogs",
-        "title": "Claude Helper: Show Logs"
+        "command": "git-changes.showLogs",
+        "title": "Git Changes: Show Logs"
       },
       {
-        "command": "claude-helper.openClaudeTerminal",
-        "title": "Claude Helper: Open Claude Terminal"
+        "command": "git-changes.refresh",
+        "title": "Git Changes: Refresh",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "git-changes.openDiff",
+        "title": "Open Diff"
       }
-    ]
+    ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "git-changes.refresh",
+          "when": "view == gitChangesView",
+          "group": "navigation"
+        }
+      ]
+    }
   },
-  "extensionDependencies": [
-    "eamodio.gitlens"
-  ],
+  "extensionDependencies": [],
   "scripts": {
     "vscode:prepublish": "npm run compile",
     "compile": "tsc -p ./",
