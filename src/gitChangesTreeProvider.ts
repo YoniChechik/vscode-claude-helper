@@ -4,28 +4,6 @@ import { exec } from 'child_process';
 import { promisify } from 'util';
 import { Logger } from './utils/logger';
 
-const _execAsync = promisify(exec);
-
-type _FileStatus = 'added' | 'deleted' | 'modified' | 'renamed';
-type _FileState = 'unstaged' | 'staged' | 'unpushed';
-
-interface _GitChange {
-    status: _FileStatus;
-    path: string;
-    oldPath?: string;
-    state: _FileState;
-}
-
-interface _TreeNode {
-    name: string;
-    fullPath: string;
-    isDirectory: boolean;
-    status?: _FileStatus;
-    oldPath?: string;
-    state?: _FileState;
-    children: Map<string, _TreeNode>;
-}
-
 export class GitChangeItem extends vscode.TreeItem {
     constructor(
         public readonly label: string,
@@ -239,8 +217,6 @@ export class GitChangesTreeProvider implements vscode.TreeDataProvider<GitChange
                 state = 'unstaged';
             } else if (stagedChanges.has(filePath)) {
                 state = 'staged';
-            } else if (hasUnpushed) {
-                state = 'unpushed';
             } else {
                 state = 'unpushed';
             }
@@ -369,4 +345,26 @@ export class GitChangesTreeProvider implements vscode.TreeDataProvider<GitChange
 
         return { status, path: filePath };
     }
+}
+
+const _execAsync = promisify(exec);
+
+type _FileStatus = 'added' | 'deleted' | 'modified' | 'renamed';
+type _FileState = 'unstaged' | 'staged' | 'unpushed';
+
+interface _GitChange {
+    status: _FileStatus;
+    path: string;
+    oldPath?: string;
+    state: _FileState;
+}
+
+interface _TreeNode {
+    name: string;
+    fullPath: string;
+    isDirectory: boolean;
+    status?: _FileStatus;
+    oldPath?: string;
+    state?: _FileState;
+    children: Map<string, _TreeNode>;
 }
