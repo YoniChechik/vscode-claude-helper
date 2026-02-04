@@ -100,6 +100,158 @@ suite('GitChangesTreeProvider Test Suite', () => {
             assert.strictEqual(item.status, 'renamed');
             assert.strictEqual(item.oldPath, 'old-name.ts');
         });
+
+        // Label format tests
+        test('should format label for modified unstaged file', () => {
+            const uri = vscode.Uri.file('/workspace/test.ts');
+            const item = new GitChangeItem(
+                'M [unstaged] test.ts',
+                vscode.TreeItemCollapsibleState.None,
+                uri,
+                'modified',
+                undefined,
+                false,
+                'unstaged'
+            );
+
+            assert.strictEqual(item.label, 'M [unstaged] test.ts');
+        });
+
+        test('should format label for added staged file', () => {
+            const uri = vscode.Uri.file('/workspace/new-file.ts');
+            const item = new GitChangeItem(
+                'A [staged] new-file.ts',
+                vscode.TreeItemCollapsibleState.None,
+                uri,
+                'added',
+                undefined,
+                false,
+                'staged'
+            );
+
+            assert.strictEqual(item.label, 'A [staged] new-file.ts');
+        });
+
+        test('should format label for deleted unpushed file', () => {
+            const uri = vscode.Uri.file('/workspace/deleted-file.ts');
+            const item = new GitChangeItem(
+                'D [unpushed] deleted-file.ts',
+                vscode.TreeItemCollapsibleState.None,
+                uri,
+                'deleted',
+                undefined,
+                false,
+                'unpushed'
+            );
+
+            assert.strictEqual(item.label, 'D [unpushed] deleted-file.ts');
+        });
+
+        test('should format label for renamed staged file', () => {
+            const uri = vscode.Uri.file('/workspace/new-name.ts');
+            const item = new GitChangeItem(
+                'R [staged] new-name.ts',
+                vscode.TreeItemCollapsibleState.None,
+                uri,
+                'renamed',
+                'old-name.ts',
+                false,
+                'staged'
+            );
+
+            assert.strictEqual(item.label, 'R [staged] new-name.ts');
+        });
+
+        // Icon tests
+        test('should have no iconPath for file items', () => {
+            const uri = vscode.Uri.file('/workspace/test.ts');
+            const item = new GitChangeItem(
+                'M [unstaged] test.ts',
+                vscode.TreeItemCollapsibleState.None,
+                uri,
+                'modified',
+                undefined,
+                false,
+                'unstaged'
+            );
+
+            assert.strictEqual(item.iconPath, undefined);
+        });
+
+        test('should have folder ThemeIcon for directory items', () => {
+            const uri = vscode.Uri.file('/workspace/src');
+            const item = new GitChangeItem(
+                'src',
+                vscode.TreeItemCollapsibleState.Expanded,
+                uri,
+                undefined,
+                undefined,
+                true
+            );
+
+            assert.ok(item.iconPath instanceof vscode.ThemeIcon);
+            assert.strictEqual((item.iconPath as vscode.ThemeIcon).id, 'folder');
+        });
+
+        // State parameter tests
+        test('should correctly set state property to unstaged', () => {
+            const uri = vscode.Uri.file('/workspace/test.ts');
+            const item = new GitChangeItem(
+                'M [unstaged] test.ts',
+                vscode.TreeItemCollapsibleState.None,
+                uri,
+                'modified',
+                undefined,
+                false,
+                'unstaged'
+            );
+
+            assert.strictEqual(item.state, 'unstaged');
+        });
+
+        test('should correctly set state property to staged', () => {
+            const uri = vscode.Uri.file('/workspace/test.ts');
+            const item = new GitChangeItem(
+                'A [staged] test.ts',
+                vscode.TreeItemCollapsibleState.None,
+                uri,
+                'added',
+                undefined,
+                false,
+                'staged'
+            );
+
+            assert.strictEqual(item.state, 'staged');
+        });
+
+        test('should correctly set state property to unpushed', () => {
+            const uri = vscode.Uri.file('/workspace/test.ts');
+            const item = new GitChangeItem(
+                'D [unpushed] test.ts',
+                vscode.TreeItemCollapsibleState.None,
+                uri,
+                'deleted',
+                undefined,
+                false,
+                'unpushed'
+            );
+
+            assert.strictEqual(item.state, 'unpushed');
+        });
+
+        test('should have undefined state when not provided', () => {
+            const uri = vscode.Uri.file('/workspace/test.ts');
+            const item = new GitChangeItem(
+                'test.ts',
+                vscode.TreeItemCollapsibleState.None,
+                uri,
+                'modified',
+                undefined,
+                false
+            );
+
+            assert.strictEqual(item.state, undefined);
+        });
     });
 
     suite('GitChangesTreeProvider', () => {
