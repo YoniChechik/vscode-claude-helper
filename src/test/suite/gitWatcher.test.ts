@@ -2,6 +2,10 @@ import * as assert from 'assert';
 import * as sinon from 'sinon';
 import { GitWatcher } from '../../gitWatcher';
 
+interface GitWatcherInternal {
+    _debouncedRefresh(): void;
+}
+
 suite('GitWatcher Test Suite', () => {
     let sandbox: sinon.SinonSandbox;
 
@@ -50,10 +54,10 @@ suite('GitWatcher Test Suite', () => {
 
             watcher.start();
 
-            const debouncedRefresh = (watcher as any)._debouncedRefresh.bind(watcher);
-            debouncedRefresh();
-            debouncedRefresh();
-            debouncedRefresh();
+            const watcherInternal = watcher as unknown as GitWatcherInternal;
+            watcherInternal._debouncedRefresh();
+            watcherInternal._debouncedRefresh();
+            watcherInternal._debouncedRefresh();
 
             await clock.tickAsync(100);
             assert.strictEqual(callback.callCount, 0);
@@ -73,8 +77,8 @@ suite('GitWatcher Test Suite', () => {
 
             watcher.start();
 
-            const debouncedRefresh = (watcher as any)._debouncedRefresh.bind(watcher);
-            debouncedRefresh();
+            const watcherInternal = watcher as unknown as GitWatcherInternal;
+            watcherInternal._debouncedRefresh();
 
             watcher.dispose();
 
