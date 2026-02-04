@@ -7,11 +7,13 @@ import { Logger } from './utils/logger';
 const _execAsync = promisify(exec);
 
 type _FileStatus = 'added' | 'deleted' | 'modified' | 'renamed';
+type _FileState = 'unstaged' | 'staged' | 'unpushed';
 
 interface _GitChange {
     status: _FileStatus;
     path: string;
     oldPath?: string;
+    state: _FileState;
 }
 
 interface _TreeNode {
@@ -20,6 +22,7 @@ interface _TreeNode {
     isDirectory: boolean;
     status?: _FileStatus;
     oldPath?: string;
+    state?: _FileState;
     children: Map<string, _TreeNode>;
 }
 
@@ -30,43 +33,31 @@ export class GitChangeItem extends vscode.TreeItem {
         public readonly resourceUri?: vscode.Uri,
         public readonly status?: _FileStatus,
         public readonly oldPath?: string,
-        public readonly isDirectory: boolean = false
+        public readonly isDirectory: boolean = false,
+        public readonly state?: _FileState
     ) {
         super(label, collapsibleState);
 
         if (!isDirectory && status && resourceUri) {
-            this.iconPath = this._getStatusIcon(status);
             this.contextValue = 'gitChangeFile';
             this.command = {
                 command: 'git-changes.openDiff',
                 title: 'Open Diff',
                 arguments: [this]
             };
-            this.tooltip = this._getTooltip(status, oldPath);
+            this.tooltip = this._getTooltip(status, oldPath, state);
         } else if (isDirectory) {
             this.contextValue = 'gitChangeDirectory';
             this.iconPath = new vscode.ThemeIcon('folder');
         }
     }
 
-    private _getStatusIcon(status: _FileStatus): vscode.ThemeIcon {
-        switch (status) {
-            case 'added':
-                return new vscode.ThemeIcon('diff-added', new vscode.ThemeColor('gitDecoration.addedResourceForeground'));
-            case 'deleted':
-                return new vscode.ThemeIcon('diff-removed', new vscode.ThemeColor('gitDecoration.deletedResourceForeground'));
-            case 'modified':
-                return new vscode.ThemeIcon('diff-modified', new vscode.ThemeColor('gitDecoration.modifiedResourceForeground'));
-            case 'renamed':
-                return new vscode.ThemeIcon('diff-renamed', new vscode.ThemeColor('gitDecoration.renamedResourceForeground'));
-        }
-    }
-
-    private _getTooltip(status: _FileStatus, oldPath?: string): string {
+    private _getTooltip(status: _FileStatus, oldPath?: string, state?: _FileState): string {
+        const stateStr = state ? ` [${state}]` : '';
         if (status === 'renamed' && oldPath) {
-            return `Renamed from ${oldPath}`;
+            return `Renamed from ${oldPath}${stateStr}`;
         }
-        return status.charAt(0).toUpperCase() + status.slice(1);
+        return status.charAt(0).toUpperCase() + status.slice(1) + stateStr;
     }
 }
 
@@ -130,18 +121,44 @@ export class GitChangesTreeProvider implements vscode.TreeDataProvider<GitChange
                 : vscode.TreeItemCollapsibleState.None;
 
             const uri = vscode.Uri.file(child.fullPath);
+            const label = child.isDirectory
+                ? child.name
+                : this._formatLabel(child.name, child.status, child.state);
 
             items.push(new GitChangeItem(
-                child.name,
+                label,
                 collapsibleState,
                 uri,
                 child.status,
                 child.oldPath,
-                child.isDirectory
+                child.isDirectory,
+                child.state
             ));
         }
 
         return items;
+    }
+
+    private _formatLabel(name: string, status?: _FileStatus, state?: _FileState): string {
+        if (!status) {
+            return name;
+        }
+        const statusLetter = this._getStatusLetter(status);
+        const stateStr = state ? ` [${state}]` : '';
+        return `${statusLetter}${stateStr} ${name}`;
+    }
+
+    private _getStatusLetter(status: _FileStatus): string {
+        switch (status) {
+            case 'added':
+                return 'A';
+            case 'deleted':
+                return 'D';
+            case 'modified':
+                return 'M';
+            case 'renamed':
+                return 'R';
+        }
     }
 
     private _findNode(root: _TreeNode, targetPath: string): _TreeNode | null {
@@ -193,6 +210,7 @@ export class GitChangesTreeProvider implements vscode.TreeDataProvider<GitChange
                     isDirectory: !isLastPart,
                     status: isLastPart ? change.status : undefined,
                     oldPath: isLastPart ? change.oldPath : undefined,
+                    state: isLastPart ? change.state : undefined,
                     children: new Map()
                 });
             }
@@ -206,12 +224,46 @@ export class GitChangesTreeProvider implements vscode.TreeDataProvider<GitChange
     }
 
     private async _getGitChanges(): Promise<_GitChange[]> {
+        const [originDiff, unstagedChanges, stagedChanges, hasUnpushed] = await Promise.all([
+            this._getOriginDiff(),
+            this._getUnstagedChanges(),
+            this._getStagedChanges(),
+            this._hasUnpushedCommits()
+        ]);
+
+        const changes: _GitChange[] = [];
+
+        for (const [filePath, parsed] of originDiff) {
+            let state: _FileState;
+            if (unstagedChanges.has(filePath)) {
+                state = 'unstaged';
+            } else if (stagedChanges.has(filePath)) {
+                state = 'staged';
+            } else if (hasUnpushed) {
+                state = 'unpushed';
+            } else {
+                state = 'unpushed';
+            }
+
+            changes.push({
+                status: parsed.status,
+                path: filePath,
+                oldPath: parsed.oldPath,
+                state
+            });
+        }
+
+        this.logger.log(`Found ${changes.length} changed files`);
+        return changes;
+    }
+
+    private async _getOriginDiff(): Promise<Map<string, { status: _FileStatus; oldPath?: string }>> {
         const { stdout } = await _execAsync(
             'git diff --name-status origin/main',
             { cwd: this.workspaceRoot }
         );
 
-        const changes: _GitChange[] = [];
+        const changes = new Map<string, { status: _FileStatus; oldPath?: string }>();
 
         for (const line of stdout.trim().split('\n')) {
             if (!line) {
@@ -220,15 +272,67 @@ export class GitChangesTreeProvider implements vscode.TreeDataProvider<GitChange
 
             const parsed = this._parseGitStatusLine(line);
             if (parsed) {
-                changes.push(parsed);
+                changes.set(parsed.path, { status: parsed.status, oldPath: parsed.oldPath });
             }
         }
 
-        this.logger.log(`Found ${changes.length} changed files`);
         return changes;
     }
 
-    private _parseGitStatusLine(line: string): _GitChange | null {
+    private async _getUnstagedChanges(): Promise<Map<string, _FileStatus>> {
+        const { stdout } = await _execAsync(
+            'git diff --name-status',
+            { cwd: this.workspaceRoot }
+        );
+
+        const changes = new Map<string, _FileStatus>();
+
+        for (const line of stdout.trim().split('\n')) {
+            if (!line) {
+                continue;
+            }
+
+            const parsed = this._parseGitStatusLine(line);
+            if (parsed) {
+                changes.set(parsed.path, parsed.status);
+            }
+        }
+
+        return changes;
+    }
+
+    private async _getStagedChanges(): Promise<Map<string, _FileStatus>> {
+        const { stdout } = await _execAsync(
+            'git diff --cached --name-status',
+            { cwd: this.workspaceRoot }
+        );
+
+        const changes = new Map<string, _FileStatus>();
+
+        for (const line of stdout.trim().split('\n')) {
+            if (!line) {
+                continue;
+            }
+
+            const parsed = this._parseGitStatusLine(line);
+            if (parsed) {
+                changes.set(parsed.path, parsed.status);
+            }
+        }
+
+        return changes;
+    }
+
+    private async _hasUnpushedCommits(): Promise<boolean> {
+        const { stdout } = await _execAsync(
+            'git log origin/main..HEAD --oneline',
+            { cwd: this.workspaceRoot }
+        );
+
+        return stdout.trim().length > 0;
+    }
+
+    private _parseGitStatusLine(line: string): { status: _FileStatus; path: string; oldPath?: string } | null {
         const parts = line.split('\t');
         if (parts.length < 2) {
             return null;
