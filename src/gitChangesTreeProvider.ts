@@ -202,11 +202,10 @@ export class GitChangesTreeProvider implements vscode.TreeDataProvider<GitChange
     }
 
     private async _getGitChanges(): Promise<_GitChange[]> {
-        const [originDiff, unstagedChanges, stagedChanges, hasUnpushed] = await Promise.all([
+        const [originDiff, unstagedChanges, stagedChanges] = await Promise.all([
             this._getOriginDiff(),
             this._getUnstagedChanges(),
-            this._getStagedChanges(),
-            this._hasUnpushedCommits()
+            this._getStagedChanges()
         ]);
 
         const changes: _GitChange[] = [];
@@ -297,15 +296,6 @@ export class GitChangesTreeProvider implements vscode.TreeDataProvider<GitChange
         }
 
         return changes;
-    }
-
-    private async _hasUnpushedCommits(): Promise<boolean> {
-        const { stdout } = await _execAsync(
-            'git log origin/main..HEAD --oneline',
-            { cwd: this.workspaceRoot }
-        );
-
-        return stdout.trim().length > 0;
     }
 
     private _parseGitStatusLine(line: string): { status: _FileStatus; path: string; oldPath?: string } | null {

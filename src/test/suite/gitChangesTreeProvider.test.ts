@@ -2,16 +2,15 @@ import * as assert from 'assert';
 import * as vscode from 'vscode';
 import * as sinon from 'sinon';
 import { GitChangesTreeProvider, GitChangeItem } from '../../gitChangesTreeProvider';
+import { Logger } from '../../utils/logger';
 
 suite('GitChangesTreeProvider Test Suite', () => {
     let sandbox: sinon.SinonSandbox;
-    let mockLogger: { log: sinon.SinonStub };
+    let mockLogger: sinon.SinonStubbedInstance<Logger>;
 
     setup(() => {
         sandbox = sinon.createSandbox();
-        mockLogger = {
-            log: sandbox.stub()
-        };
+        mockLogger = sandbox.createStubInstance(Logger);
     });
 
     teardown(() => {
@@ -101,7 +100,6 @@ suite('GitChangesTreeProvider Test Suite', () => {
             assert.strictEqual(item.oldPath, 'old-name.ts');
         });
 
-        // Label format tests
         test('should format label for modified unstaged file', () => {
             const uri = vscode.Uri.file('/workspace/test.ts');
             const item = new GitChangeItem(
@@ -162,7 +160,6 @@ suite('GitChangesTreeProvider Test Suite', () => {
             assert.strictEqual(item.label, 'R [staged] new-name.ts');
         });
 
-        // Icon tests
         test('should have no iconPath for file items', () => {
             const uri = vscode.Uri.file('/workspace/test.ts');
             const item = new GitChangeItem(
@@ -193,7 +190,6 @@ suite('GitChangesTreeProvider Test Suite', () => {
             assert.strictEqual((item.iconPath as vscode.ThemeIcon).id, 'folder');
         });
 
-        // State parameter tests
         test('should correctly set state property to unstaged', () => {
             const uri = vscode.Uri.file('/workspace/test.ts');
             const item = new GitChangeItem(
@@ -256,12 +252,12 @@ suite('GitChangesTreeProvider Test Suite', () => {
 
     suite('GitChangesTreeProvider', () => {
         test('should create provider with workspace root', () => {
-            const provider = new GitChangesTreeProvider('/workspace', mockLogger as any);
+            const provider = new GitChangesTreeProvider('/workspace', mockLogger);
             assert.ok(provider);
         });
 
         test('should return TreeItem from getTreeItem', () => {
-            const provider = new GitChangesTreeProvider('/workspace', mockLogger as any);
+            const provider = new GitChangesTreeProvider('/workspace', mockLogger);
             const uri = vscode.Uri.file('/workspace/test.ts');
             const item = new GitChangeItem(
                 'test.ts',
@@ -277,12 +273,12 @@ suite('GitChangesTreeProvider Test Suite', () => {
         });
 
         test('should have onDidChangeTreeData event', () => {
-            const provider = new GitChangesTreeProvider('/workspace', mockLogger as any);
+            const provider = new GitChangesTreeProvider('/workspace', mockLogger);
             assert.ok(provider.onDidChangeTreeData);
         });
 
         test('should fire event on refresh', () => {
-            const provider = new GitChangesTreeProvider('/workspace', mockLogger as any);
+            const provider = new GitChangesTreeProvider('/workspace', mockLogger);
             let eventFired = false;
 
             provider.onDidChangeTreeData(() => {
