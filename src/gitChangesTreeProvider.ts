@@ -101,7 +101,7 @@ export class GitChangesTreeProvider implements vscode.TreeDataProvider<GitChange
             const uri = vscode.Uri.file(child.fullPath);
             const label = child.isDirectory
                 ? child.name
-                : this._formatLabel(child.name, child.status, child.state);
+                : this._formatLabel(child.name, child.state);
 
             items.push(new GitChangeItem(
                 label,
@@ -117,26 +117,9 @@ export class GitChangesTreeProvider implements vscode.TreeDataProvider<GitChange
         return items;
     }
 
-    private _formatLabel(name: string, status?: _FileStatus, state?: _FileState): string {
-        if (!status) {
-            return name;
-        }
-        const statusLetter = this._getStatusLetter(status);
+    private _formatLabel(name: string, state?: _FileState): string {
         const stateStr = state ? ` [${state}]` : '';
-        return `${statusLetter}${stateStr} ${name}`;
-    }
-
-    private _getStatusLetter(status: _FileStatus): string {
-        switch (status) {
-            case 'added':
-                return 'A';
-            case 'deleted':
-                return 'D';
-            case 'modified':
-                return 'M';
-            case 'renamed':
-                return 'R';
-        }
+        return `${name}${stateStr}`;
     }
 
     private _findNode(root: _TreeNode, targetPath: string): _TreeNode | null {
@@ -202,10 +185,11 @@ export class GitChangesTreeProvider implements vscode.TreeDataProvider<GitChange
     }
 
     private async _getGitChanges(): Promise<_GitChange[]> {
-        const [originDiff, unstagedChanges, stagedChanges] = await Promise.all([
+        const [originDiff, unstagedChanges, stagedChanges, untrackedFiles] = await Promise.all([
             this._getOriginDiff(),
             this._getUnstagedChanges(),
-            this._getStagedChanges()
+            this._getStagedChanges(),
+            this._getUntrackedFiles()
         ]);
 
         const changes: _GitChange[] = [];
@@ -225,6 +209,14 @@ export class GitChangesTreeProvider implements vscode.TreeDataProvider<GitChange
                 path: filePath,
                 oldPath: parsed.oldPath,
                 state
+            });
+        }
+
+        for (const filePath of untrackedFiles) {
+            changes.push({
+                status: 'added',
+                path: filePath,
+                state: 'untracked'
             });
         }
 
@@ -298,6 +290,23 @@ export class GitChangesTreeProvider implements vscode.TreeDataProvider<GitChange
         return changes;
     }
 
+    private async _getUntrackedFiles(): Promise<string[]> {
+        const { stdout } = await _execAsync(
+            'git ls-files --others --exclude-standard',
+            { cwd: this.workspaceRoot }
+        );
+
+        const files: string[] = [];
+
+        for (const line of stdout.trim().split('\n')) {
+            if (line) {
+                files.push(line);
+            }
+        }
+
+        return files;
+    }
+
     private _parseGitStatusLine(line: string): { status: _FileStatus; path: string; oldPath?: string } | null {
         const parts = line.split('\t');
         if (parts.length < 2) {
@@ -340,7 +349,7 @@ export class GitChangesTreeProvider implements vscode.TreeDataProvider<GitChange
 const _execAsync = promisify(exec);
 
 type _FileStatus = 'added' | 'deleted' | 'modified' | 'renamed';
-type _FileState = 'unstaged' | 'staged' | 'unpushed';
+type _FileState = 'unstaged' | 'staged' | 'unpushed' | 'untracked';
 
 interface _GitChange {
     status: _FileStatus;
