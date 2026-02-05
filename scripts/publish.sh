@@ -22,6 +22,6 @@ echo "Running tests..."
 npm test
 
 echo "Publishing extension..."
-npx @vscode/vsce publish -p "$VSCE_PAT"
+AZURE_DEVOPS_ORG=chechikyoni VSCE_PAT="$VSCE_PAT" npx vsce publish
 
 echo "Published successfully!"

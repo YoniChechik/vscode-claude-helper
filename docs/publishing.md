@@ -1,5 +1,7 @@
 # Publishing
 
+For first-time setup (creating publisher, getting PAT), see [first_time_setup.md](first_time_setup.md).
+
 ## 1. Bump version and push
 
 ```bash
@@ -10,6 +12,11 @@ npm version patch && git push && git push --tags
 
 ```bash
 source .env && AZURE_DEVOPS_ORG=chechikyoni VSCE_PAT="$VSCE_PAT" npx vsce publish
+```
+
+Or use the npm script (also runs tests):
+```bash
+npm run publish
 ```
 
 The `.env` file should contain:
