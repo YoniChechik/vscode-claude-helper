@@ -2,7 +2,7 @@
   "name": "git-changes-view",
   "displayName": "Git Changes View",
   "description": "Live-updating tree view of changed files compared to origin/main",
-  "version": "2.0.2",
+  "version": "2.0.3",
   "publisher": "YoniChechik",
   "author": {
     "name": "Yoni Chechik"
