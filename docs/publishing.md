@@ -21,3 +21,4 @@ VSCE_PAT=<your-pat>
 
 - Generate PAT at [Azure DevOps](https://dev.azure.com/) with **Marketplace > Manage** scope
 - The org name `chechikyoni` is required for the PAT to work
+- Regenerate PAT: https://dev.azure.com/chechikyoni/_usersSettings/tokens
