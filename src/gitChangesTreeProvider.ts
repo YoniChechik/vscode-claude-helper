@@ -24,6 +24,7 @@ export class GitChangeItem extends vscode.TreeItem {
                 arguments: [this]
             };
             this.tooltip = this._getTooltip(status, oldPath, state);
+            this.iconPath = this._getIconForStatus(status);
         } else if (isDirectory) {
             this.contextValue = 'gitChangeDirectory';
             this.iconPath = new vscode.ThemeIcon('folder');
@@ -36,6 +37,19 @@ export class GitChangeItem extends vscode.TreeItem {
             return `Renamed from ${oldPath}${stateStr}`;
         }
         return status.charAt(0).toUpperCase() + status.slice(1) + stateStr;
+    }
+
+    private _getIconForStatus(status: _FileStatus): vscode.ThemeIcon {
+        switch (status) {
+            case 'added':
+                return new vscode.ThemeIcon('file', new vscode.ThemeColor('gitDecoration.addedResourceForeground'));
+            case 'deleted':
+                return new vscode.ThemeIcon('file', new vscode.ThemeColor('gitDecoration.deletedResourceForeground'));
+            case 'modified':
+                return new vscode.ThemeIcon('file', new vscode.ThemeColor('gitDecoration.modifiedResourceForeground'));
+            case 'renamed':
+                return new vscode.ThemeIcon('file', new vscode.ThemeColor('gitDecoration.renamedResourceForeground'));
+        }
     }
 }
 
