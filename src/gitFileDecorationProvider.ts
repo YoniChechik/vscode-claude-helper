@@ -31,7 +31,7 @@ export class GitFileDecorationProvider implements vscode.FileDecorationProvider 
 }
 
 export const STATUS_TO_COLOR: Record<FileStatus, string> = {
-    added: 'gitDecoration.addedResourceForeground',
+    added: 'gitChangesView.addedForeground',
     deleted: 'gitDecoration.deletedResourceForeground',
     modified: 'gitDecoration.modifiedResourceForeground',
     renamed: 'gitDecoration.renamedResourceForeground',

@@ -75,7 +75,19 @@
           "group": "navigation"
         }
       ]
-    }
+    },
+    "colors": [
+      {
+        "id": "gitChangesView.addedForeground",
+        "description": "Color for added files in Git Changes tree view",
+        "defaults": {
+          "dark": "#2ea043",
+          "light": "#1a7f37",
+          "highContrast": "#2ea043",
+          "highContrastLight": "#1a7f37"
+        }
+      }
+    ]
   },
   "extensionDependencies": [],
   "scripts": {
