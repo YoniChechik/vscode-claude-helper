@@ -160,7 +160,7 @@ suite('GitChangesTreeProvider Test Suite', () => {
             assert.strictEqual(item.label, 'R [staged] new-name.ts');
         });
 
-        test('should have no iconPath for file items', () => {
+        test('should have colored file ThemeIcon for file items', () => {
             const uri = vscode.Uri.file('/workspace/test.ts');
             const item = new GitChangeItem(
                 'M [unstaged] test.ts',
@@ -172,7 +172,8 @@ suite('GitChangesTreeProvider Test Suite', () => {
                 'unstaged'
             );
 
-            assert.strictEqual(item.iconPath, undefined);
+            assert.ok(item.iconPath instanceof vscode.ThemeIcon);
+            assert.strictEqual((item.iconPath as vscode.ThemeIcon).id, 'file');
         });
 
         test('should have folder ThemeIcon for directory items', () => {
