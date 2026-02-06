@@ -78,9 +78,7 @@ export class GitChangesTreeProvider implements vscode.TreeDataProvider<GitChange
             return this._getChildItems(this._treeRoot!);
         }
 
-        const targetPath = element.resourceUri!.scheme === 'git-changes-tree'
-            ? element.resourceUri!.path
-            : element.resourceUri!.fsPath;
+        const targetPath = element.resourceUri!.path;
         const node = this._findNode(this._treeRoot!, targetPath);
         if (!node) {
             return [];
