@@ -3,14 +3,14 @@ import * as path from 'path';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import { Logger } from './utils/logger';
-import { FileStatus } from './gitFileDecorationProvider';
+import { FileStatus, STATUS_TO_COLOR } from './gitFileDecorationProvider';
 
 export class GitChangeItem extends vscode.TreeItem {
     constructor(
         public readonly label: string,
         public readonly collapsibleState: vscode.TreeItemCollapsibleState,
         public readonly resourceUri?: vscode.Uri,
-        public readonly status?: _FileStatus,
+        public readonly status?: FileStatus,
         public readonly oldPath?: string,
         public readonly isDirectory: boolean = false,
         public readonly state?: _FileState
@@ -32,7 +32,7 @@ export class GitChangeItem extends vscode.TreeItem {
         }
     }
 
-    private _getTooltip(status: _FileStatus, oldPath?: string, state?: _FileState): string {
+    private _getTooltip(status: FileStatus, oldPath?: string, state?: _FileState): string {
         const stateStr = state ? ` [${state}]` : '';
         if (status === 'renamed' && oldPath) {
             return `Renamed from ${oldPath}${stateStr}`;
@@ -40,17 +40,8 @@ export class GitChangeItem extends vscode.TreeItem {
         return status.charAt(0).toUpperCase() + status.slice(1) + stateStr;
     }
 
-    private _getIconForStatus(status: _FileStatus): vscode.ThemeIcon {
-        switch (status) {
-            case 'added':
-                return new vscode.ThemeIcon('file', new vscode.ThemeColor('gitDecoration.addedResourceForeground'));
-            case 'deleted':
-                return new vscode.ThemeIcon('file', new vscode.ThemeColor('gitDecoration.deletedResourceForeground'));
-            case 'modified':
-                return new vscode.ThemeIcon('file', new vscode.ThemeColor('gitDecoration.modifiedResourceForeground'));
-            case 'renamed':
-                return new vscode.ThemeIcon('file', new vscode.ThemeColor('gitDecoration.renamedResourceForeground'));
-        }
+    private _getIconForStatus(status: FileStatus): vscode.ThemeIcon {
+        return new vscode.ThemeIcon('file', new vscode.ThemeColor(STATUS_TO_COLOR[status]));
     }
 }
 
@@ -92,7 +83,7 @@ export class GitChangesTreeProvider implements vscode.TreeDataProvider<GitChange
         return this._getChildItems(node);
     }
 
-    getFileStatuses(): Map<string, FileStatus> {
+    private _getFileStatuses(): Map<string, FileStatus> {
         const statuses = new Map<string, FileStatus>();
         if (this._treeRoot) {
             this._collectFileStatuses(this._treeRoot, statuses);
@@ -181,7 +172,7 @@ export class GitChangesTreeProvider implements vscode.TreeDataProvider<GitChange
             this._addToTree(change);
         }
 
-        this.onTreeBuilt?.(this.getFileStatuses());
+        this.onTreeBuilt?.(this._getFileStatuses());
     }
 
     private _addToTree(change: _GitChange): void {
@@ -249,13 +240,13 @@ export class GitChangesTreeProvider implements vscode.TreeDataProvider<GitChange
         return changes;
     }
 
-    private async _getOriginDiff(): Promise<Map<string, { status: _FileStatus; oldPath?: string }>> {
+    private async _getOriginDiff(): Promise<Map<string, { status: FileStatus; oldPath?: string }>> {
         const { stdout } = await _execAsync(
             'git diff --name-status origin/main',
             { cwd: this._workspaceRoot }
         );
 
-        const changes = new Map<string, { status: _FileStatus; oldPath?: string }>();
+        const changes = new Map<string, { status: FileStatus; oldPath?: string }>();
 
         for (const line of stdout.trim().split('\n')) {
             if (!line) {
@@ -271,13 +262,13 @@ export class GitChangesTreeProvider implements vscode.TreeDataProvider<GitChange
         return changes;
     }
 
-    private async _getUnstagedChanges(): Promise<Map<string, _FileStatus>> {
+    private async _getUnstagedChanges(): Promise<Map<string, FileStatus>> {
         const { stdout } = await _execAsync(
             'git diff --name-status',
             { cwd: this._workspaceRoot }
         );
 
-        const changes = new Map<string, _FileStatus>();
+        const changes = new Map<string, FileStatus>();
 
         for (const line of stdout.trim().split('\n')) {
             if (!line) {
@@ -293,13 +284,13 @@ export class GitChangesTreeProvider implements vscode.TreeDataProvider<GitChange
         return changes;
     }
 
-    private async _getStagedChanges(): Promise<Map<string, _FileStatus>> {
+    private async _getStagedChanges(): Promise<Map<string, FileStatus>> {
         const { stdout } = await _execAsync(
             'git diff --cached --name-status',
             { cwd: this._workspaceRoot }
         );
 
-        const changes = new Map<string, _FileStatus>();
+        const changes = new Map<string, FileStatus>();
 
         for (const line of stdout.trim().split('\n')) {
             if (!line) {
@@ -332,7 +323,7 @@ export class GitChangesTreeProvider implements vscode.TreeDataProvider<GitChange
         return files;
     }
 
-    private _parseGitStatusLine(line: string): { status: _FileStatus; path: string; oldPath?: string } | null {
+    private _parseGitStatusLine(line: string): { status: FileStatus; path: string; oldPath?: string } | null {
         const parts = line.split('\t');
         if (parts.length < 2) {
             return null;
@@ -351,7 +342,7 @@ export class GitChangesTreeProvider implements vscode.TreeDataProvider<GitChange
             };
         }
 
-        let status: _FileStatus;
+        let status: FileStatus;
         switch (statusCode) {
             case 'A':
                 status = 'added';
@@ -373,11 +364,10 @@ export class GitChangesTreeProvider implements vscode.TreeDataProvider<GitChange
 
 const _execAsync = promisify(exec);
 
-type _FileStatus = FileStatus;
 type _FileState = 'unstaged' | 'staged' | 'unpushed' | 'untracked';
 
 interface _GitChange {
-    status: _FileStatus;
+    status: FileStatus;
     path: string;
     oldPath?: string;
     state: _FileState;
@@ -387,7 +377,7 @@ interface _TreeNode {
     name: string;
     fullPath: string;
     isDirectory: boolean;
-    status?: _FileStatus;
+    status?: FileStatus;
     oldPath?: string;
     state?: _FileState;
     children: Map<string, _TreeNode>;

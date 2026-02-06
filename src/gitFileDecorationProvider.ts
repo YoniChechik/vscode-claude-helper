@@ -20,7 +20,7 @@ export class GitFileDecorationProvider implements vscode.FileDecorationProvider 
         return new vscode.FileDecoration(
             undefined,
             undefined,
-            new vscode.ThemeColor(_STATUS_TO_COLOR[status])
+            new vscode.ThemeColor(STATUS_TO_COLOR[status])
         );
     }
 
@@ -30,7 +30,7 @@ export class GitFileDecorationProvider implements vscode.FileDecorationProvider 
     }
 }
 
-const _STATUS_TO_COLOR: Record<FileStatus, string> = {
+export const STATUS_TO_COLOR: Record<FileStatus, string> = {
     added: 'gitDecoration.addedResourceForeground',
     deleted: 'gitDecoration.deletedResourceForeground',
     modified: 'gitDecoration.modifiedResourceForeground',
