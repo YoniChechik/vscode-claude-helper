@@ -58,17 +58,17 @@ export class GitChangesTreeProvider implements vscode.TreeDataProvider<GitChange
     private _onDidChangeTreeData = new vscode.EventEmitter<GitChangeItem | undefined>();
     readonly onDidChangeTreeData = this._onDidChangeTreeData.event;
 
-    private treeRoot: _TreeNode | null = null;
+    private _treeRoot: _TreeNode | null = null;
 
     onTreeBuilt: ((statuses: Map<string, FileStatus>) => void) | undefined;
 
     constructor(
-        private workspaceRoot: string,
-        private logger: Logger
+        private _workspaceRoot: string,
+        private _logger: Logger
     ) {}
 
     refresh(): void {
-        this.treeRoot = null;
+        this._treeRoot = null;
         this._onDidChangeTreeData.fire(undefined);
     }
 
@@ -77,27 +77,27 @@ export class GitChangesTreeProvider implements vscode.TreeDataProvider<GitChange
     }
 
     async getChildren(element?: GitChangeItem): Promise<GitChangeItem[]> {
-        if (!this.treeRoot) {
+        if (!this._treeRoot) {
             await this._buildTree();
         }
 
-        if (!this.treeRoot) {
-            return [];
-        }
-
         if (!element) {
-            return this._getChildItems(this.treeRoot);
+            return this._getChildItems(this._treeRoot!);
         }
 
-        if (!element.resourceUri) {
-            return [];
-        }
-
-        const node = this._findNode(this.treeRoot, element.resourceUri.fsPath);
+        const node = this._findNode(this._treeRoot!, element.resourceUri!.fsPath);
         if (!node) {
             return [];
         }
         return this._getChildItems(node);
+    }
+
+    getFileStatuses(): Map<string, FileStatus> {
+        const statuses = new Map<string, FileStatus>();
+        if (this._treeRoot) {
+            this._collectFileStatuses(this._treeRoot, statuses);
+        }
+        return statuses;
     }
 
     private _getChildItems(node: _TreeNode): GitChangeItem[] {
@@ -156,14 +156,6 @@ export class GitChangesTreeProvider implements vscode.TreeDataProvider<GitChange
         return null;
     }
 
-    getFileStatuses(): Map<string, FileStatus> {
-        const statuses = new Map<string, FileStatus>();
-        if (this.treeRoot) {
-            this._collectFileStatuses(this.treeRoot, statuses);
-        }
-        return statuses;
-    }
-
     private _collectFileStatuses(node: _TreeNode, statuses: Map<string, FileStatus>): void {
         for (const child of node.children.values()) {
             if (child.isDirectory) {
@@ -178,9 +170,9 @@ export class GitChangesTreeProvider implements vscode.TreeDataProvider<GitChange
     private async _buildTree(): Promise<void> {
         const changes = await this._getGitChanges();
 
-        this.treeRoot = {
+        this._treeRoot = {
             name: '',
-            fullPath: this.workspaceRoot,
+            fullPath: this._workspaceRoot,
             isDirectory: true,
             children: new Map()
         };
@@ -193,16 +185,13 @@ export class GitChangesTreeProvider implements vscode.TreeDataProvider<GitChange
     }
 
     private _addToTree(change: _GitChange): void {
-        if (!this.treeRoot) {
-            return;
-        }
         const parts = change.path.split('/');
-        let currentNode = this.treeRoot;
+        let currentNode = this._treeRoot!;
 
         for (let i = 0; i < parts.length; i++) {
             const part = parts[i];
             const isLastPart = i === parts.length - 1;
-            const fullPath = path.join(this.workspaceRoot, ...parts.slice(0, i + 1));
+            const fullPath = path.join(this._workspaceRoot, ...parts.slice(0, i + 1));
 
             if (!currentNode.children.has(part)) {
                 currentNode.children.set(part, {
@@ -216,11 +205,7 @@ export class GitChangesTreeProvider implements vscode.TreeDataProvider<GitChange
                 });
             }
 
-            const nextNode = currentNode.children.get(part);
-            if (!nextNode) {
-                return;
-            }
-            currentNode = nextNode;
+            currentNode = currentNode.children.get(part)!;
         }
     }
 
@@ -260,14 +245,14 @@ export class GitChangesTreeProvider implements vscode.TreeDataProvider<GitChange
             });
         }
 
-        this.logger.log(`Found ${changes.length} changed files`);
+        this._logger.log(`Found ${changes.length} changed files`);
         return changes;
     }
 
     private async _getOriginDiff(): Promise<Map<string, { status: _FileStatus; oldPath?: string }>> {
         const { stdout } = await _execAsync(
             'git diff --name-status origin/main',
-            { cwd: this.workspaceRoot }
+            { cwd: this._workspaceRoot }
         );
 
         const changes = new Map<string, { status: _FileStatus; oldPath?: string }>();
@@ -289,7 +274,7 @@ export class GitChangesTreeProvider implements vscode.TreeDataProvider<GitChange
     private async _getUnstagedChanges(): Promise<Map<string, _FileStatus>> {
         const { stdout } = await _execAsync(
             'git diff --name-status',
-            { cwd: this.workspaceRoot }
+            { cwd: this._workspaceRoot }
         );
 
         const changes = new Map<string, _FileStatus>();
@@ -311,7 +296,7 @@ export class GitChangesTreeProvider implements vscode.TreeDataProvider<GitChange
     private async _getStagedChanges(): Promise<Map<string, _FileStatus>> {
         const { stdout } = await _execAsync(
             'git diff --cached --name-status',
-            { cwd: this.workspaceRoot }
+            { cwd: this._workspaceRoot }
         );
 
         const changes = new Map<string, _FileStatus>();
@@ -333,7 +318,7 @@ export class GitChangesTreeProvider implements vscode.TreeDataProvider<GitChange
     private async _getUntrackedFiles(): Promise<string[]> {
         const { stdout } = await _execAsync(
             'git ls-files --others --exclude-standard',
-            { cwd: this.workspaceRoot }
+            { cwd: this._workspaceRoot }
         );
 
         const files: string[] = [];
@@ -378,7 +363,7 @@ export class GitChangesTreeProvider implements vscode.TreeDataProvider<GitChange
                 status = 'modified';
                 break;
             default:
-                this.logger.log(`Unknown status code: ${statusCode}`);
+                this._logger.log(`Unknown status code: ${statusCode}`);
                 status = 'modified';
         }
 

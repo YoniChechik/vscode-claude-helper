@@ -6,20 +6,20 @@ import { GitContentProvider } from './gitContentProvider';
 import { GitFileDecorationProvider } from './gitFileDecorationProvider';
 import { Logger } from './utils/logger';
 
-let logger: Logger;
+let _logger: Logger;
 
 export async function activate(context: vscode.ExtensionContext) {
     const outputChannel = vscode.window.createOutputChannel('Git Changes');
     context.subscriptions.push(outputChannel);
-    logger = new Logger(outputChannel);
+    _logger = new Logger(outputChannel);
 
     const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
     if (!workspaceRoot) {
-        logger.log('No workspace folder found');
+        _logger.log('No workspace folder found');
         return;
     }
 
-    logger.log('Git Changes extension activated');
+    _logger.log('Git Changes extension activated');
 
     context.subscriptions.push(
         vscode.commands.registerCommand('git-changes.showLogs', () => {
@@ -37,7 +37,7 @@ export async function activate(context: vscode.ExtensionContext) {
         vscode.window.registerFileDecorationProvider(decorationProvider)
     );
 
-    const treeProvider = new GitChangesTreeProvider(workspaceRoot, logger);
+    const treeProvider = new GitChangesTreeProvider(workspaceRoot, _logger);
     treeProvider.onTreeBuilt = (statuses) => decorationProvider.updateDecorations(statuses);
 
     const treeView = vscode.window.createTreeView('gitChangesView', {
@@ -48,7 +48,7 @@ export async function activate(context: vscode.ExtensionContext) {
 
     context.subscriptions.push(
         vscode.commands.registerCommand('git-changes.refresh', () => {
-            logger.log('Manual refresh triggered');
+            _logger.log('Manual refresh triggered');
             treeProvider.refresh();
         })
     );
@@ -66,14 +66,12 @@ export async function activate(context: vscode.ExtensionContext) {
     treeProvider.refresh();
 }
 
-async function _openDiff(item: GitChangeItem, workspaceRoot: string): Promise<void> {
-    if (!item.resourceUri) {
-        return;
-    }
+export function deactivate(): void {}
 
-    const filePath = item.resourceUri.scheme === 'git-changes-tree'
-        ? item.resourceUri.path
-        : item.resourceUri.fsPath;
+async function _openDiff(item: GitChangeItem, workspaceRoot: string): Promise<void> {
+    const filePath = item.resourceUri!.scheme === 'git-changes-tree'
+        ? item.resourceUri!.path
+        : item.resourceUri!.fsPath;
     const relativePath = path.relative(workspaceRoot, filePath);
     const fileUri = vscode.Uri.file(filePath);
 
@@ -98,7 +96,7 @@ async function _openDiff(item: GitChangeItem, workspaceRoot: string): Promise<vo
             break;
         }
         case 'renamed': {
-            const oldPath = item.oldPath || relativePath;
+            const oldPath = item.oldPath!;
             const leftUri = vscode.Uri.parse(`git-changes:${oldPath}?ref=origin/main`);
             await vscode.commands.executeCommand(
                 'vscode.diff',
@@ -109,8 +107,4 @@ async function _openDiff(item: GitChangeItem, workspaceRoot: string): Promise<vo
             break;
         }
     }
-}
-
-export function deactivate(): void {
-    // Extension cleanup handled by VS Code via subscriptions
 }

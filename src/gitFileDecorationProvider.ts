@@ -2,13 +2,6 @@ import * as vscode from 'vscode';
 
 export type FileStatus = 'added' | 'deleted' | 'modified' | 'renamed';
 
-const _STATUS_TO_COLOR: Record<FileStatus, string> = {
-    added: 'gitDecoration.addedResourceForeground',
-    deleted: 'gitDecoration.deletedResourceForeground',
-    modified: 'gitDecoration.modifiedResourceForeground',
-    renamed: 'gitDecoration.renamedResourceForeground',
-};
-
 export class GitFileDecorationProvider implements vscode.FileDecorationProvider {
     private _decorations = new Map<string, FileStatus>();
     private _onDidChangeFileDecorations = new vscode.EventEmitter<vscode.Uri | vscode.Uri[] | undefined>();
@@ -36,3 +29,10 @@ export class GitFileDecorationProvider implements vscode.FileDecorationProvider 
         this._onDidChangeFileDecorations.fire(undefined);
     }
 }
+
+const _STATUS_TO_COLOR: Record<FileStatus, string> = {
+    added: 'gitDecoration.addedResourceForeground',
+    deleted: 'gitDecoration.deletedResourceForeground',
+    modified: 'gitDecoration.modifiedResourceForeground',
+    renamed: 'gitDecoration.renamedResourceForeground',
+};
