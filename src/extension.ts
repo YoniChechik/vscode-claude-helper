@@ -66,7 +66,9 @@ export async function activate(context: vscode.ExtensionContext) {
     treeProvider.refresh();
 }
 
-export function deactivate(): void {}
+export function deactivate(): void {
+    return;
+}
 
 async function _openDiff(item: GitChangeItem, workspaceRoot: string): Promise<void> {
     const filePath = item.resourceUri!.scheme === 'git-changes-tree'
