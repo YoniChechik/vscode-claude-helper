@@ -152,11 +152,13 @@ export class GitChangesTreeProvider implements vscode.TreeDataProvider<GitChange
         for (const child of node.children.values()) {
             if (child.isDirectory) {
                 if (child.status) {
-                    statuses.set(`git-changes-tree:${child.fullPath}`, child.status);
+                    const uri = vscode.Uri.parse(`git-changes-tree:${child.fullPath}`);
+                    statuses.set(uri.toString(), child.status);
                 }
                 this._collectFileStatuses(child, statuses);
             } else if (child.status) {
-                statuses.set(`git-changes-tree:${child.fullPath}`, child.status);
+                const uri = vscode.Uri.parse(`git-changes-tree:${child.fullPath}`);
+                statuses.set(uri.toString(), child.status);
             }
         }
     }
