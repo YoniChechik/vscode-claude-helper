@@ -130,19 +130,19 @@ suite('GitChangesTreeProvider Test Suite', () => {
             assert.strictEqual(item.label, 'A [staged] new-file.ts');
         });
 
-        test('should format label for deleted unpushed file', () => {
+        test('should format label for committed file with no state', () => {
             const uri = vscode.Uri.file('/workspace/deleted-file.ts');
             const item = new GitChangeItem(
-                'D [unpushed] deleted-file.ts',
+                'deleted-file.ts',
                 vscode.TreeItemCollapsibleState.None,
                 uri,
                 'deleted',
                 undefined,
-                false,
-                'unpushed'
+                false
             );
 
-            assert.strictEqual(item.label, 'D [unpushed] deleted-file.ts');
+            assert.strictEqual(item.label, 'deleted-file.ts');
+            assert.strictEqual(item.state, undefined);
         });
 
         test('should format label for renamed staged file', () => {
@@ -221,19 +221,18 @@ suite('GitChangesTreeProvider Test Suite', () => {
             assert.strictEqual(item.state, 'staged');
         });
 
-        test('should correctly set state property to unpushed', () => {
+        test('should have undefined state for committed file', () => {
             const uri = vscode.Uri.file('/workspace/test.ts');
             const item = new GitChangeItem(
-                'D [unpushed] test.ts',
+                'test.ts',
                 vscode.TreeItemCollapsibleState.None,
                 uri,
                 'deleted',
                 undefined,
-                false,
-                'unpushed'
+                false
             );
 
-            assert.strictEqual(item.state, 'unpushed');
+            assert.strictEqual(item.state, undefined);
         });
 
         test('should have undefined state when not provided', () => {

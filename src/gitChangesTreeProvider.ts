@@ -211,13 +211,11 @@ export class GitChangesTreeProvider implements vscode.TreeDataProvider<GitChange
         const changes: _GitChange[] = [];
 
         for (const [filePath, parsed] of originDiff) {
-            let state: _FileState;
+            let state: _FileState | undefined;
             if (unstagedChanges.has(filePath)) {
                 state = 'unstaged';
             } else if (stagedChanges.has(filePath)) {
                 state = 'staged';
-            } else {
-                state = 'unpushed';
             }
 
             changes.push({
@@ -364,13 +362,13 @@ export class GitChangesTreeProvider implements vscode.TreeDataProvider<GitChange
 
 const _execAsync = promisify(exec);
 
-type _FileState = 'unstaged' | 'staged' | 'unpushed' | 'untracked';
+type _FileState = 'unstaged' | 'staged' | 'untracked';
 
 interface _GitChange {
     status: FileStatus;
     path: string;
     oldPath?: string;
-    state: _FileState;
+    state?: _FileState;
 }
 
 interface _TreeNode {
