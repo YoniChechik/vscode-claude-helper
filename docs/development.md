@@ -43,6 +43,30 @@ npm run compile && npx @vscode/vsce package && code --install-extension git-chan
 # Then reload VS Code window (Ctrl+Shift+P -> Reload Window)
 ```
 
+## Dev UI Testing
+
+Launch a separate VS Code window with the extension loaded in development mode. Changes take effect after recompiling and reloading (no packaging needed).
+
+```bash
+# Compile and launch dev VS Code
+npm run compile && code --extensionDevelopmentPath=$(pwd) .
+```
+
+This opens a new VS Code window where:
+- The extension runs from the compiled `out/` directory
+- Use `npm run watch` in a terminal for auto-recompilation on save
+- Press `Ctrl+Shift+P` -> "Developer: Reload Window" to reload after changes
+- The dev window is isolated from your normal VS Code extensions
+
+For watch mode (auto-compile + manual reload):
+```bash
+# Terminal 1: Watch for changes
+npm run watch
+
+# Terminal 2: Launch dev VS Code
+code --extensionDevelopmentPath=$(pwd) .
+```
+
 ## Debugging
 
 ### View Extension Logs
