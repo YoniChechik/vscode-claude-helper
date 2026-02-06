@@ -351,4 +351,300 @@ suite('GitChangesTreeProvider Test Suite', () => {
             assert.strictEqual(eventFired, true);
         });
     });
+
+    suite('Directory status computation', () => {
+        function _stubGitChanges(
+            provider: GitChangesTreeProvider,
+            changes: { status: string; path: string; oldPath?: string; state?: string }[]
+        ): void {
+            sandbox.stub(provider as any, '_getGitChanges').resolves(changes);
+        }
+
+        test('should color directory when all children are deleted', async () => {
+            const provider = new GitChangesTreeProvider('/workspace', mockLogger);
+            _stubGitChanges(provider, [
+                { status: 'deleted', path: 'src/a.ts' },
+                { status: 'deleted', path: 'src/b.ts' },
+            ]);
+
+            let statuses: Map<string, string> | undefined;
+            provider.onTreeBuilt = (s) => { statuses = s; };
+
+            await provider.getChildren();
+
+            assert.ok(statuses);
+            assert.strictEqual(statuses!.get('git-changes-tree:/workspace/src'), 'deleted');
+        });
+
+        test('should color directory when all children are added', async () => {
+            const provider = new GitChangesTreeProvider('/workspace', mockLogger);
+            _stubGitChanges(provider, [
+                { status: 'added', path: 'lib/x.ts' },
+                { status: 'added', path: 'lib/y.ts' },
+            ]);
+
+            let statuses: Map<string, string> | undefined;
+            provider.onTreeBuilt = (s) => { statuses = s; };
+
+            await provider.getChildren();
+
+            assert.ok(statuses);
+            assert.strictEqual(statuses!.get('git-changes-tree:/workspace/lib'), 'added');
+        });
+
+        test('should color directory when all children are modified', async () => {
+            const provider = new GitChangesTreeProvider('/workspace', mockLogger);
+            _stubGitChanges(provider, [
+                { status: 'modified', path: 'src/a.ts' },
+                { status: 'modified', path: 'src/b.ts' },
+            ]);
+
+            let statuses: Map<string, string> | undefined;
+            provider.onTreeBuilt = (s) => { statuses = s; };
+
+            await provider.getChildren();
+
+            assert.ok(statuses);
+            assert.strictEqual(statuses!.get('git-changes-tree:/workspace/src'), 'modified');
+        });
+
+        test('should not color directory when children have mixed statuses', async () => {
+            const provider = new GitChangesTreeProvider('/workspace', mockLogger);
+            _stubGitChanges(provider, [
+                { status: 'deleted', path: 'src/a.ts' },
+                { status: 'modified', path: 'src/b.ts' },
+            ]);
+
+            let statuses: Map<string, string> | undefined;
+            provider.onTreeBuilt = (s) => { statuses = s; };
+
+            await provider.getChildren();
+
+            assert.ok(statuses);
+            assert.strictEqual(statuses!.has('git-changes-tree:/workspace/src'), false);
+        });
+
+        test('should color nested directories when all descendants are deleted', async () => {
+            const provider = new GitChangesTreeProvider('/workspace', mockLogger);
+            _stubGitChanges(provider, [
+                { status: 'deleted', path: 'src/sub/a.ts' },
+                { status: 'deleted', path: 'src/sub/b.ts' },
+            ]);
+
+            let statuses: Map<string, string> | undefined;
+            provider.onTreeBuilt = (s) => { statuses = s; };
+
+            await provider.getChildren();
+
+            assert.ok(statuses);
+            assert.strictEqual(statuses!.get('git-changes-tree:/workspace/src/sub'), 'deleted');
+            assert.strictEqual(statuses!.get('git-changes-tree:/workspace/src'), 'deleted');
+        });
+
+        test('should color parent directory when nested dirs all share same status', async () => {
+            const provider = new GitChangesTreeProvider('/workspace', mockLogger);
+            _stubGitChanges(provider, [
+                { status: 'deleted', path: 'src/a/x.ts' },
+                { status: 'deleted', path: 'src/b/y.ts' },
+            ]);
+
+            let statuses: Map<string, string> | undefined;
+            provider.onTreeBuilt = (s) => { statuses = s; };
+
+            await provider.getChildren();
+
+            assert.ok(statuses);
+            assert.strictEqual(statuses!.get('git-changes-tree:/workspace/src/a'), 'deleted');
+            assert.strictEqual(statuses!.get('git-changes-tree:/workspace/src/b'), 'deleted');
+            assert.strictEqual(statuses!.get('git-changes-tree:/workspace/src'), 'deleted');
+        });
+
+        test('should return directory tree item with deleted status', async () => {
+            const provider = new GitChangesTreeProvider('/workspace', mockLogger);
+            _stubGitChanges(provider, [
+                { status: 'deleted', path: 'src/a.ts' },
+                { status: 'deleted', path: 'src/b.ts' },
+            ]);
+
+            const rootChildren = await provider.getChildren();
+            assert.strictEqual(rootChildren.length, 1);
+
+            const dirItem = rootChildren[0];
+            assert.strictEqual(dirItem.label, 'src');
+            assert.strictEqual(dirItem.isDirectory, true);
+            assert.strictEqual(dirItem.status, 'deleted');
+            assert.ok(dirItem.iconPath instanceof vscode.ThemeIcon);
+            assert.strictEqual((dirItem.iconPath as vscode.ThemeIcon).id, 'folder');
+            assert.ok((dirItem.iconPath as vscode.ThemeIcon).color);
+        });
+
+        test('should return directory tree item with no status for mixed children', async () => {
+            const provider = new GitChangesTreeProvider('/workspace', mockLogger);
+            _stubGitChanges(provider, [
+                { status: 'deleted', path: 'src/a.ts' },
+                { status: 'added', path: 'src/b.ts' },
+            ]);
+
+            const rootChildren = await provider.getChildren();
+            assert.strictEqual(rootChildren.length, 1);
+
+            const dirItem = rootChildren[0];
+            assert.strictEqual(dirItem.label, 'src');
+            assert.strictEqual(dirItem.isDirectory, true);
+            assert.strictEqual(dirItem.status, undefined);
+        });
+
+        test('should color directory with mix of direct and nested deleted files', async () => {
+            const provider = new GitChangesTreeProvider('/workspace', mockLogger);
+            _stubGitChanges(provider, [
+                { status: 'deleted', path: 'src/a.ts' },
+                { status: 'deleted', path: 'src/sub/b.ts' },
+                { status: 'deleted', path: 'src/sub/c.ts' },
+            ]);
+
+            let statuses: Map<string, string> | undefined;
+            provider.onTreeBuilt = (s) => { statuses = s; };
+
+            const rootChildren = await provider.getChildren();
+
+            assert.ok(statuses);
+            assert.strictEqual(statuses!.get('git-changes-tree:/workspace/src/sub'), 'deleted');
+            assert.strictEqual(statuses!.get('git-changes-tree:/workspace/src'), 'deleted');
+
+            const dirItem = rootChildren[0];
+            assert.strictEqual(dirItem.status, 'deleted');
+        });
+
+        test('should handle directory with only subdirectories containing deleted files', async () => {
+            const provider = new GitChangesTreeProvider('/workspace', mockLogger);
+            _stubGitChanges(provider, [
+                { status: 'deleted', path: 'src/a/file1.ts' },
+                { status: 'deleted', path: 'src/b/file2.ts' },
+                { status: 'deleted', path: 'src/c/d/file3.ts' },
+            ]);
+
+            let statuses: Map<string, string> | undefined;
+            provider.onTreeBuilt = (s) => { statuses = s; };
+
+            await provider.getChildren();
+
+            assert.ok(statuses);
+            assert.strictEqual(statuses!.get('git-changes-tree:/workspace/src'), 'deleted');
+        });
+
+        test('should return deleted file children when expanding deleted directory', async () => {
+            const provider = new GitChangesTreeProvider('/workspace', mockLogger);
+            _stubGitChanges(provider, [
+                { status: 'deleted', path: 'src/a.ts' },
+                { status: 'deleted', path: 'src/b.ts' },
+            ]);
+
+            const rootChildren = await provider.getChildren();
+            const dirItem = rootChildren[0];
+            assert.strictEqual(dirItem.label, 'src');
+            assert.strictEqual(dirItem.status, 'deleted');
+
+            // Simulate expanding the directory (VS Code calls getChildren with the dir item)
+            const dirChildren = await provider.getChildren(dirItem);
+            assert.strictEqual(dirChildren.length, 2);
+            assert.strictEqual(dirChildren[0].status, 'deleted');
+            assert.strictEqual(dirChildren[1].status, 'deleted');
+        });
+
+        test('should color deleted dir alongside other changes at root', async () => {
+            const provider = new GitChangesTreeProvider('/workspace', mockLogger);
+            _stubGitChanges(provider, [
+                { status: 'deleted', path: 'removed-dir/a.ts' },
+                { status: 'deleted', path: 'removed-dir/b.ts' },
+                { status: 'modified', path: 'still-here.ts' },
+            ]);
+
+            const rootChildren = await provider.getChildren();
+
+            assert.strictEqual(rootChildren.length, 2);
+            const dirItem = rootChildren.find(item => item.label === 'removed-dir');
+            const fileItem = rootChildren.find(item => (item.label as string).includes('still-here'));
+
+            assert.ok(dirItem);
+            assert.strictEqual(dirItem!.status, 'deleted');
+            assert.strictEqual(dirItem!.isDirectory, true);
+
+            assert.ok(fileItem);
+            assert.strictEqual(fileItem!.status, 'modified');
+        });
+
+        test('should handle deleted dir inside another dir with other changes', async () => {
+            const provider = new GitChangesTreeProvider('/workspace', mockLogger);
+            _stubGitChanges(provider, [
+                { status: 'deleted', path: 'src/removed/a.ts' },
+                { status: 'deleted', path: 'src/removed/b.ts' },
+                { status: 'modified', path: 'src/kept.ts' },
+            ]);
+
+            let statuses: Map<string, string> | undefined;
+            provider.onTreeBuilt = (s) => { statuses = s; };
+
+            await provider.getChildren();
+
+            assert.ok(statuses);
+            // removed dir should be deleted
+            assert.strictEqual(statuses!.get('git-changes-tree:/workspace/src/removed'), 'deleted');
+            // src dir should NOT have a status (mixed: deleted + modified)
+            assert.strictEqual(statuses!.has('git-changes-tree:/workspace/src'), false);
+        });
+
+        test('should include both directory and file statuses in onTreeBuilt', async () => {
+            const provider = new GitChangesTreeProvider('/workspace', mockLogger);
+            _stubGitChanges(provider, [
+                { status: 'deleted', path: 'a/x.ts' },
+                { status: 'deleted', path: 'a/y.ts' },
+                { status: 'added', path: 'b/z.ts' },
+            ]);
+
+            let receivedStatuses: Map<string, string> | undefined;
+            provider.onTreeBuilt = (s) => { receivedStatuses = s; };
+
+            await provider.getChildren();
+
+            assert.ok(receivedStatuses);
+            assert.strictEqual(receivedStatuses!.get('git-changes-tree:/workspace/a'), 'deleted');
+            assert.strictEqual(receivedStatuses!.get('git-changes-tree:/workspace/b'), 'added');
+            assert.strictEqual(receivedStatuses!.get('git-changes-tree:/workspace/a/x.ts'), 'deleted');
+            assert.strictEqual(receivedStatuses!.get('git-changes-tree:/workspace/a/y.ts'), 'deleted');
+            assert.strictEqual(receivedStatuses!.get('git-changes-tree:/workspace/b/z.ts'), 'added');
+        });
+
+        test('should color deeply nested deleted directory chain', async () => {
+            const provider = new GitChangesTreeProvider('/workspace', mockLogger);
+            _stubGitChanges(provider, [
+                { status: 'deleted', path: 'a/b/c/d/file.ts' },
+            ]);
+
+            let statuses: Map<string, string> | undefined;
+            provider.onTreeBuilt = (s) => { statuses = s; };
+
+            await provider.getChildren();
+
+            assert.ok(statuses);
+            assert.strictEqual(statuses!.get('git-changes-tree:/workspace/a/b/c/d'), 'deleted');
+            assert.strictEqual(statuses!.get('git-changes-tree:/workspace/a/b/c'), 'deleted');
+            assert.strictEqual(statuses!.get('git-changes-tree:/workspace/a/b'), 'deleted');
+            assert.strictEqual(statuses!.get('git-changes-tree:/workspace/a'), 'deleted');
+        });
+
+        test('should color single-file directory as deleted', async () => {
+            const provider = new GitChangesTreeProvider('/workspace', mockLogger);
+            _stubGitChanges(provider, [
+                { status: 'deleted', path: 'dir/only.ts' },
+            ]);
+
+            let statuses: Map<string, string> | undefined;
+            provider.onTreeBuilt = (s) => { statuses = s; };
+
+            await provider.getChildren();
+
+            assert.ok(statuses);
+            assert.strictEqual(statuses!.get('git-changes-tree:/workspace/dir'), 'deleted');
+        });
+    });
 });
