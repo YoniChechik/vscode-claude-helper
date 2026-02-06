@@ -3,6 +3,7 @@ import * as path from 'path';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import { Logger } from './utils/logger';
+import { FileStatus } from './gitFileDecorationProvider';
 
 export class GitChangeItem extends vscode.TreeItem {
     constructor(
@@ -59,6 +60,8 @@ export class GitChangesTreeProvider implements vscode.TreeDataProvider<GitChange
 
     private treeRoot: _TreeNode | null = null;
 
+    onTreeBuilt: ((statuses: Map<string, FileStatus>) => void) | undefined;
+
     constructor(
         private workspaceRoot: string,
         private logger: Logger
@@ -112,7 +115,9 @@ export class GitChangesTreeProvider implements vscode.TreeDataProvider<GitChange
                 ? vscode.TreeItemCollapsibleState.Expanded
                 : vscode.TreeItemCollapsibleState.None;
 
-            const uri = vscode.Uri.file(child.fullPath);
+            const uri = child.isDirectory
+                ? vscode.Uri.file(child.fullPath)
+                : vscode.Uri.parse(`git-changes-tree:${child.fullPath}`);
             const label = child.isDirectory
                 ? child.name
                 : this._formatLabel(child.name, child.state);
@@ -151,6 +156,25 @@ export class GitChangesTreeProvider implements vscode.TreeDataProvider<GitChange
         return null;
     }
 
+    getFileStatuses(): Map<string, FileStatus> {
+        const statuses = new Map<string, FileStatus>();
+        if (this.treeRoot) {
+            this._collectFileStatuses(this.treeRoot, statuses);
+        }
+        return statuses;
+    }
+
+    private _collectFileStatuses(node: _TreeNode, statuses: Map<string, FileStatus>): void {
+        for (const child of node.children.values()) {
+            if (child.isDirectory) {
+                this._collectFileStatuses(child, statuses);
+            } else if (child.status) {
+                const uriString = `git-changes-tree:${child.fullPath}`;
+                statuses.set(uriString, child.status);
+            }
+        }
+    }
+
     private async _buildTree(): Promise<void> {
         const changes = await this._getGitChanges();
 
@@ -164,6 +188,8 @@ export class GitChangesTreeProvider implements vscode.TreeDataProvider<GitChange
         for (const change of changes) {
             this._addToTree(change);
         }
+
+        this.onTreeBuilt?.(this.getFileStatuses());
     }
 
     private _addToTree(change: _GitChange): void {
@@ -362,7 +388,7 @@ export class GitChangesTreeProvider implements vscode.TreeDataProvider<GitChange
 
 const _execAsync = promisify(exec);
 
-type _FileStatus = 'added' | 'deleted' | 'modified' | 'renamed';
+type _FileStatus = FileStatus;
 type _FileState = 'unstaged' | 'staged' | 'unpushed' | 'untracked';
 
 interface _GitChange {

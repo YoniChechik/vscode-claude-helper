@@ -3,6 +3,7 @@ import * as path from 'path';
 import { GitChangesTreeProvider, GitChangeItem } from './gitChangesTreeProvider';
 import { GitWatcher } from './gitWatcher';
 import { GitContentProvider } from './gitContentProvider';
+import { GitFileDecorationProvider } from './gitFileDecorationProvider';
 import { Logger } from './utils/logger';
 
 let logger: Logger;
@@ -31,7 +32,13 @@ export async function activate(context: vscode.ExtensionContext) {
         vscode.workspace.registerTextDocumentContentProvider('git-changes', gitContentProvider)
     );
 
+    const decorationProvider = new GitFileDecorationProvider();
+    context.subscriptions.push(
+        vscode.window.registerFileDecorationProvider(decorationProvider)
+    );
+
     const treeProvider = new GitChangesTreeProvider(workspaceRoot, logger);
+    treeProvider.onTreeBuilt = (statuses) => decorationProvider.updateDecorations(statuses);
 
     const treeView = vscode.window.createTreeView('gitChangesView', {
         treeDataProvider: treeProvider,
@@ -64,23 +71,25 @@ async function _openDiff(item: GitChangeItem, workspaceRoot: string): Promise<vo
         return;
     }
 
-    const filePath = item.resourceUri.fsPath;
+    const filePath = item.resourceUri.scheme === 'git-changes-tree'
+        ? item.resourceUri.path
+        : item.resourceUri.fsPath;
     const relativePath = path.relative(workspaceRoot, filePath);
+    const fileUri = vscode.Uri.file(filePath);
 
     switch (item.status) {
         case 'modified': {
             const leftUri = vscode.Uri.parse(`git-changes:${relativePath}?ref=origin/main`);
-            const rightUri = item.resourceUri;
             await vscode.commands.executeCommand(
                 'vscode.diff',
                 leftUri,
-                rightUri,
+                fileUri,
                 `${relativePath} (origin/main <-> Working Tree)`
             );
             break;
         }
         case 'added': {
-            await vscode.commands.executeCommand('vscode.open', item.resourceUri);
+            await vscode.commands.executeCommand('vscode.open', fileUri);
             break;
         }
         case 'deleted': {
@@ -91,11 +100,10 @@ async function _openDiff(item: GitChangeItem, workspaceRoot: string): Promise<vo
         case 'renamed': {
             const oldPath = item.oldPath || relativePath;
             const leftUri = vscode.Uri.parse(`git-changes:${oldPath}?ref=origin/main`);
-            const rightUri = item.resourceUri;
             await vscode.commands.executeCommand(
                 'vscode.diff',
                 leftUri,
-                rightUri,
+                fileUri,
                 `${oldPath} -> ${relativePath}`
             );
             break;
