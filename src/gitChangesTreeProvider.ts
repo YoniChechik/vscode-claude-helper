@@ -201,11 +201,12 @@ export class GitChangesTreeProvider implements vscode.TreeDataProvider<GitChange
     }
 
     private async _getGitChanges(): Promise<_GitChange[]> {
-        const [originDiff, unstagedChanges, stagedChanges, untrackedFiles] = await Promise.all([
+        const [originDiff, unstagedChanges, stagedChanges, untrackedFiles, unpushedFiles] = await Promise.all([
             this._getOriginDiff(),
             this._getUnstagedChanges(),
             this._getStagedChanges(),
-            this._getUntrackedFiles()
+            this._getUntrackedFiles(),
+            this._getUnpushedFiles()
         ]);
 
         const changes: _GitChange[] = [];
@@ -216,6 +217,8 @@ export class GitChangesTreeProvider implements vscode.TreeDataProvider<GitChange
                 state = 'unstaged';
             } else if (stagedChanges.has(filePath)) {
                 state = 'staged';
+            } else if (unpushedFiles === null || unpushedFiles.has(filePath)) {
+                state = 'unpushed';
             }
 
             changes.push({
@@ -321,6 +324,30 @@ export class GitChangesTreeProvider implements vscode.TreeDataProvider<GitChange
         return files;
     }
 
+    private async _getUnpushedFiles(): Promise<Set<string> | null> {
+        try {
+            const { stdout: branchName } = await _execAsync(
+                'git rev-parse --abbrev-ref HEAD',
+                { cwd: this._workspaceRoot }
+            );
+            const branch = branchName.trim();
+            const { stdout } = await _execAsync(
+                `git diff --name-only origin/${branch}..HEAD`,
+                { cwd: this._workspaceRoot }
+            );
+            const files = new Set<string>();
+            for (const line of stdout.trim().split('\n')) {
+                if (line) {
+                    files.add(line);
+                }
+            }
+            return files;
+        } catch {
+            // Remote branch doesn't exist — all committed files are unpushed
+            return null;
+        }
+    }
+
     private _parseGitStatusLine(line: string): { status: FileStatus; path: string; oldPath?: string } | null {
         const parts = line.split('\t');
         if (parts.length < 2) {
@@ -362,7 +389,7 @@ export class GitChangesTreeProvider implements vscode.TreeDataProvider<GitChange
 
 const _execAsync = promisify(exec);
 
-type _FileState = 'unstaged' | 'staged' | 'untracked';
+type _FileState = 'unstaged' | 'staged' | 'untracked' | 'unpushed';
 
 interface _GitChange {
     status: FileStatus;

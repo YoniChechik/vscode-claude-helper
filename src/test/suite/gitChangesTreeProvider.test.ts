@@ -235,6 +235,21 @@ suite('GitChangesTreeProvider Test Suite', () => {
             assert.strictEqual(item.state, undefined);
         });
 
+        test('should correctly set state property to unpushed', () => {
+            const uri = vscode.Uri.file('/workspace/test.ts');
+            const item = new GitChangeItem(
+                'test.ts [unpushed]',
+                vscode.TreeItemCollapsibleState.None,
+                uri,
+                'modified',
+                undefined,
+                false,
+                'unpushed'
+            );
+
+            assert.strictEqual(item.state, 'unpushed');
+        });
+
         test('should have undefined state when not provided', () => {
             const uri = vscode.Uri.file('/workspace/test.ts');
             const item = new GitChangeItem(
