@@ -28,7 +28,9 @@ export class GitChangeItem extends vscode.TreeItem {
             this.iconPath = this._getIconForStatus(status);
         } else if (isDirectory) {
             this.contextValue = 'gitChangeDirectory';
-            this.iconPath = new vscode.ThemeIcon('folder');
+            this.iconPath = status
+                ? new vscode.ThemeIcon('folder', new vscode.ThemeColor(STATUS_TO_COLOR[status]))
+                : new vscode.ThemeIcon('folder');
         }
     }
 
@@ -76,7 +78,10 @@ export class GitChangesTreeProvider implements vscode.TreeDataProvider<GitChange
             return this._getChildItems(this._treeRoot!);
         }
 
-        const node = this._findNode(this._treeRoot!, element.resourceUri!.fsPath);
+        const targetPath = element.resourceUri!.scheme === 'git-changes-tree'
+            ? element.resourceUri!.path
+            : element.resourceUri!.fsPath;
+        const node = this._findNode(this._treeRoot!, targetPath);
         if (!node) {
             return [];
         }
@@ -106,9 +111,7 @@ export class GitChangesTreeProvider implements vscode.TreeDataProvider<GitChange
                 ? vscode.TreeItemCollapsibleState.Expanded
                 : vscode.TreeItemCollapsibleState.None;
 
-            const uri = child.isDirectory
-                ? vscode.Uri.file(child.fullPath)
-                : vscode.Uri.parse(`git-changes-tree:${child.fullPath}`);
+            const uri = vscode.Uri.parse(`git-changes-tree:${child.fullPath}`);
             const label = child.isDirectory
                 ? child.name
                 : this._formatLabel(child.name, child.state);
@@ -150,10 +153,12 @@ export class GitChangesTreeProvider implements vscode.TreeDataProvider<GitChange
     private _collectFileStatuses(node: _TreeNode, statuses: Map<string, FileStatus>): void {
         for (const child of node.children.values()) {
             if (child.isDirectory) {
+                if (child.status) {
+                    statuses.set(`git-changes-tree:${child.fullPath}`, child.status);
+                }
                 this._collectFileStatuses(child, statuses);
             } else if (child.status) {
-                const uriString = `git-changes-tree:${child.fullPath}`;
-                statuses.set(uriString, child.status);
+                statuses.set(`git-changes-tree:${child.fullPath}`, child.status);
             }
         }
     }
@@ -172,7 +177,47 @@ export class GitChangesTreeProvider implements vscode.TreeDataProvider<GitChange
             this._addToTree(change);
         }
 
+        this._computeDirectoryStatuses(this._treeRoot);
         this.onTreeBuilt?.(this._getFileStatuses());
+    }
+
+    private _computeDirectoryStatuses(node: _TreeNode): FileStatus | 'mixed' | undefined {
+        if (!node.isDirectory) {
+            return node.status;
+        }
+
+        let uniformStatus: FileStatus | undefined;
+        let hasDescendantFiles = false;
+
+        for (const child of node.children.values()) {
+            const childResult = this._computeDirectoryStatuses(child);
+            if (childResult === 'mixed') {
+                hasDescendantFiles = true;
+                uniformStatus = undefined;
+                break;
+            }
+            if (childResult === undefined) {
+                continue;
+            }
+            hasDescendantFiles = true;
+            if (uniformStatus === undefined) {
+                uniformStatus = childResult;
+            } else if (uniformStatus !== childResult) {
+                uniformStatus = undefined;
+                break;
+            }
+        }
+
+        if (hasDescendantFiles && uniformStatus) {
+            node.status = uniformStatus;
+            return uniformStatus;
+        }
+
+        if (hasDescendantFiles) {
+            return 'mixed';
+        }
+
+        return undefined;
     }
 
     private _addToTree(change: _GitChange): void {

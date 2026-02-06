@@ -191,6 +191,53 @@ suite('GitChangesTreeProvider Test Suite', () => {
             assert.strictEqual((item.iconPath as vscode.ThemeIcon).id, 'folder');
         });
 
+        test('should have colored folder ThemeIcon for directory with uniform status', () => {
+            const uri = vscode.Uri.parse('git-changes-tree:/workspace/src');
+            const item = new GitChangeItem(
+                'src',
+                vscode.TreeItemCollapsibleState.Expanded,
+                uri,
+                'added',
+                undefined,
+                true
+            );
+
+            assert.ok(item.iconPath instanceof vscode.ThemeIcon);
+            assert.strictEqual((item.iconPath as vscode.ThemeIcon).id, 'folder');
+            assert.ok((item.iconPath as vscode.ThemeIcon).color);
+        });
+
+        test('should have plain folder ThemeIcon for directory with no status', () => {
+            const uri = vscode.Uri.parse('git-changes-tree:/workspace/src');
+            const item = new GitChangeItem(
+                'src',
+                vscode.TreeItemCollapsibleState.Expanded,
+                uri,
+                undefined,
+                undefined,
+                true
+            );
+
+            assert.ok(item.iconPath instanceof vscode.ThemeIcon);
+            assert.strictEqual((item.iconPath as vscode.ThemeIcon).id, 'folder');
+            assert.strictEqual((item.iconPath as vscode.ThemeIcon).color, undefined);
+        });
+
+        test('should use git-changes-tree URI scheme for directory items', () => {
+            const uri = vscode.Uri.parse('git-changes-tree:/workspace/src');
+            const item = new GitChangeItem(
+                'src',
+                vscode.TreeItemCollapsibleState.Expanded,
+                uri,
+                'added',
+                undefined,
+                true
+            );
+
+            assert.strictEqual(item.resourceUri!.scheme, 'git-changes-tree');
+            assert.strictEqual(item.resourceUri!.path, '/workspace/src');
+        });
+
         test('should correctly set state property to unstaged', () => {
             const uri = vscode.Uri.file('/workspace/test.ts');
             const item = new GitChangeItem(
